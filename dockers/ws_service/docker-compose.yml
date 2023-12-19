@@ -1,0 +1,22 @@
+version: '3.3'
+
+services:
+  ws-service:
+    # container_name: ws-service
+    image: ws-service:v0.0.1
+
+    networks:
+      red:
+        # aliases:
+        #   - user.ss.localhost
+    env_file:
+      - .env
+    restart: always
+    volumes:
+      - ./_certs:/etc/certs:ro
+    #Configuracion Autoscaling de Traefik
+    # deploy:
+        # replicas: 2
+networks:
+  red:
+    external: true

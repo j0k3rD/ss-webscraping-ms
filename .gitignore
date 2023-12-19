@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local configuration file
+.env
+
+# Compiled Python files
+*.pyc
+
+# Virtual environment
+venv/
+
+# IDE (por ejemplo, PyCharm)
+.idea/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Logs y archivos temporales
+*.log
+*.swp
+
+# Archivos de configuración específicos del sistema operativo
+.DS_Store
+Thumbs.db
