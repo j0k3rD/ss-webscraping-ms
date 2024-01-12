@@ -17,6 +17,7 @@ services:
     #Configuracion Autoscaling de Traefik
     # deploy:
         # replicas: 2
+        
 networks:
   red:
     external: true

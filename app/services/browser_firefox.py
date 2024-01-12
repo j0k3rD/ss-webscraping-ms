@@ -1,21 +1,20 @@
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.remote.webdriver import WebDriver
-from main.services.browser import Browser 
+from app.services.browser import Browser
 
 
 class FirefoxBrowser(Browser):
-
     def _get_service(self):
         service = Service()
         return service
 
     def _get_options(self):
         options = webdriver.FirefoxOptions()
-        #-----------------------#
-        #-Run in headless mode--#
+        # -----------------------#
+        # -Run in headless mode--#
         options.headless = True
-        #-----------------------#
+        # -----------------------#
         options.set_preference("browser.cache.disk.enable", False)
         options.set_preference("browser.cache.memory.enable", False)
         options.set_preference("browser.cache.offline.enable", False)
@@ -26,17 +25,19 @@ class FirefoxBrowser(Browser):
         return options
 
     def _get_browser(self):
-        browser = webdriver.Firefox(options=self._get_options(), service=self._get_service())
-        #browser.set_window_position(0, 0)
+        browser = webdriver.Firefox(
+            options=self._get_options(), service=self._get_service()
+        )
+        # browser.set_window_position(0, 0)
         return browser
 
-    def search(self, url:str) -> WebDriver:
-        '''
+    def navegate_to_page(self, url: str) -> WebDriver:
+        """
         Funcion que realiza la busqueda en el navegador
 
         param:
             - url: Url a buscar
-        '''
+        """
         browser = self._get_browser()
         browser.get(url)
         return browser

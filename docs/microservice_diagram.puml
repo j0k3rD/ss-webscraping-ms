@@ -1,0 +1,11 @@
+@startuml Microservice diagram
+
+cloud user_info as user
+cloud comunication as com
+database database as db
+
+com - user : comunication group
+user -- db: get/set user info
+com -- db: get/set messages
+
+@enduml

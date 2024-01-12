@@ -1,3 +1,4 @@
+from app.services.browser import Browser
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -6,9 +7,14 @@ from flask import Flask, jsonify
 
 
 class ScrapServicesEcogas:
-    def __init__(self, client_number):
-        self.client_number = client_number
-        self.browser = None
+    def __init__(self, browser: Browser):
+        '''
+        Constructor de la clase
+
+        param:
+            - browser: Navegador que se va a utilizar para realizar la búsqueda
+        '''
+        self.browser = browser
 
     def setup_browser(self):
         chrome_options = Options()

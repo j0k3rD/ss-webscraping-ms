@@ -1,34 +1,54 @@
+from app.services.browser import Browser
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from flask import Flask, jsonify
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.remote.webdriver import WebDriver
 
 
 class ScrapServicesCTNET:
-    def __init__(self, client_number):
-        self.client_number = client_number
-        self.browser = None
+    def __init__(self, browser: Browser):
+        """
+        Constructor de la clase
 
-    def setup_browser(self):
-        chrome_options = Options()
-        chrome_options.add_experimental_option("detach", True)
-        self.browser = webdriver.Chrome(options=chrome_options)
+        param:
+            - browser: Navegador que se va a utilizar para realizar la búsqueda
+        """
+        self.browser = browser
 
-    def search(self):
-        url = 'https://www.cabletelevisoracolor.com/clientes.php'
-        self.browser.get(url)
+    def search(self, client_number):
+        url = "https://www.cabletelevisoracolor.com/clientes.php"
+        html = self.browser.navegate_to_page(url)
+        result = self.parser(html, client_number)
+        html.close()
+        return result
 
-        # Ingresamos el número de cliente en el campo de texto
-        user_input = self.browser.find_element(By.ID, "user")
+    def parser(self, html: WebDriver, client_number):
+        user_input = html.find_element(By.ID, "user")
         user_input.click()
-        user_input.send_keys(self.client_number)
+        user_input.send_keys(client_number)
 
-        # Hacemos clic en el botón de login
-        self.browser.find_element(By.CLASS_NAME, 'button_mictc_2').click()
+        html.find_element(By.CLASS_NAME, "button_mictc_2").click()
 
-        # Pausa para verificar el resultado en el navegador
-        input("Presiona Enter después de verificar el resultado...")
+        time.sleep(2)
 
-    def close_browser(self):
-        if self.browser:
-            self.browser.quit()
+        html.find_elements(By.CLASS_NAME, "button_mictc_clientes")[0].click()
+
+        WebDriverWait(html, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, '//div[@class="listado-facturas sucursal-page"]/h2')
+            )
+        )
+
+        h2_text = html.find_element(
+            By.XPATH, '//div[@class="listado-facturas sucursal-page"]/h2'
+        ).text
+
+        if "EL CLIENTE NO REGISTRA DEUDA." in h2_text:
+            result = None
+        else:
+            result = h2_text
+
+        return result
