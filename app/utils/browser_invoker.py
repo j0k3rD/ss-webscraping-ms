@@ -1,4 +1,4 @@
-from app.services import FirefoxBrowser
+from app.services import FirefoxBrowser, ChromeBrowser
 from .invoker import Invoker
 
 
@@ -10,7 +10,7 @@ class InvokerBrowser(Invoker):
     def __init__(self):
         self.__list_commands = {
             "firefox": FirefoxBrowser(),
-            # "chrome": ChromeBrowser(),
+            "chrome": ChromeBrowser(),
         }
 
     def get_command(self, command_name):

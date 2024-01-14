@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from selenium.webdriver.remote.webdriver import WebDriver
+from playwright.sync_api import Browser as PlaywrightBrowser
 
 
 class Browser(ABC):
@@ -8,34 +8,25 @@ class Browser(ABC):
     """
 
     @abstractmethod
-    def _get_options(self):
-        """
-        Método abstracto para obtener las opciones del navegador
-        """
-        pass
-
-    @abstractmethod
-    def _get_service(self):
-        """
-        Método abstracto para obtener el servicio del navegador
-        """
-        pass
-
-    @abstractmethod
-    def _get_browser(self):
+    def _get_browser(self) -> PlaywrightBrowser:
         """
         Método abstracto para obtener el navegador
         """
         pass
 
     @abstractmethod
-    def navegate_to_page(self, url: str) -> WebDriver:
+    def navigate_to_page(self, url: str):
         """
         Método abstracto para buscar en el navegador
 
         param:
             - url: Url del sitio del servicio
-        return:
-            - WebDriver: Navegador con la búsqueda realizada
+        """
+        pass
+
+    @abstractmethod
+    def close_browser(self):
+        """
+        Método abstracto para cerrar el navegador
         """
         pass

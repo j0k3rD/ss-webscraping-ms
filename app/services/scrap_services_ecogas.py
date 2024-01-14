@@ -1,56 +1,57 @@
-from app.services.browser import Browser
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from playwright.async_api import Page
 from anticaptchaofficial.recaptchav2proxyless import *
-from flask import Flask, jsonify
+import os
+from ..data.constants import URL_GAS_PROVIDER, TABLE_ERROR, NO_DEBT
 
 
 class ScrapServicesEcogas:
-    def __init__(self, browser: Browser):
-        '''
-        Constructor de la clase
-
-        param:
-            - browser: Navegador que se va a utilizar para realizar la búsqueda
-        '''
+    def __init__(self, browser):
         self.browser = browser
+        self.solver = recaptchaV2Proxyless()
+        self.solver.set_verbose(1)
+        self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
 
-    def setup_browser(self):
-        chrome_options = Options()
-        chrome_options.add_experimental_option("detach", True)
-        self.browser = webdriver.Chrome(options=chrome_options)
+    async def search(self, client_number):
+        url = URL_GAS_PROVIDER
+        page = await self.browser.navigate_to_page(url)
 
-    def search(self):
-        url = "https://autogestion.ecogas.com.ar/uiextranet/ingreso?s=p"
-        self.browser.get(url)
+        await page.fill("#cliente", str(client_number))
 
-        # Ingresamos el número de cliente en el campo de texto
-        self.browser.find_element(By.ID, "cliente").send_keys(self.client_number)
+        sitekey_element = await page.query_selector(
+            '//*[@id="form_login_po"]/div[2]/div'
+        )
+        print("sitekey", sitekey_element)
+        sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
+        print(sitekey_clean)
 
-        # Obtener el valor del sitio captcha
-        sitekey = self.browser.find_element(By.XPATH, '//*[@id="form_login_po"]/div[2]/div')
-        sitekey_clean = sitekey.get_attribute("data-sitekey")
+        # Solve captcha
+        self.solver.set_website_url(url)
+        self.solver.set_website_key(sitekey_clean)
 
-        # Resolver captcha utilizando el script de anticaptcha
-        self.solve_captcha(sitekey_clean)
-
-    def solve_captcha(self, sitekey_clean):
-        solver = recaptchaV2Proxyless()
-        solver.set_verbose(1)
-        solver.set_key("6febdd44044bec146bc89db5f8943f72")
-        solver.set_website_url("https://autogestion.ecogas.com.ar/uiextranet/ingreso?s=p")
-        solver.set_website_key(sitekey_clean)
-
-        g_response = solver.solve_and_return_solution()
+        g_response = self.solver.solve_and_return_solution()
         if g_response != 0:
             print("g-response: " + g_response)
-            js_script = f"document.getElementById('g-recaptcha-response').innerHTML = '{g_response}'"
-            self.browser.execute_script(js_script)
-            self.browser.find_element(By.XPATH, '//*[@id="boton_ingreso"]').click()
-        else:
-            print("task finished with error " + solver.error_code)
 
-    def close_browser(self):
-        if self.browser:
-            self.browser.quit()
+            await page.evaluate(
+                f"document.getElementById('g-recaptcha-response').innerHTML = '{g_response}'"
+            )
+            await page.click('//*[@id="boton_ingreso"]')
+
+            try:
+                table_element = await page.wait_for_selector(
+                    ".table.table-hover.table-sm"
+                )
+                print(table_element)
+                contenido = await table_element.inner_html()
+                print(contenido)
+                if "fdocdeu" in contenido:
+                    print(contenido)
+                else:
+                    print(NO_DEBT)
+            except Exception:
+                print(TABLE_ERROR)
+
+        else:
+            print("task finished with error " + self.solver.error_code)
+
+        await page.close()

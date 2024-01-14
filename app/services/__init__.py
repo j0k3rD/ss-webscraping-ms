@@ -3,3 +3,4 @@ from .scrap_service_ctnet import ScrapServicesCTNET
 from .scrap_services_ecogas import ScrapServicesEcogas
 from .scrap_services_edemsa import ScrapServicesEdemsa
 from .browser_firefox import FirefoxBrowser
+from .browser_chrome import ChromeBrowser

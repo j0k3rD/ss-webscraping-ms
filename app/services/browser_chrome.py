@@ -1,44 +1,29 @@
-# from selenium import webdriver
-# from selenium.webdriver.remote.webdriver import WebDriver
-# from selenium.webdriver.chrome.service import Service
-# from app.services.browser import Browser
-# from webdriver_manager.chrome import ChromeDriverManager
+from playwright.async_api import async_playwright, Browser as PlaywrightBrowser
+from app.services.browser import Browser
 
 
-# class ChromeBrowser(Browser):
-#     """
-#     Clase que representa el navegador Chrome
+class ChromeBrowser(Browser):
+    """
+    Clase que representa el navegador Chromium
+    """
 
-#     param:
-#         - Browser: Clase abstracta de busqueda
-#     """
+    def __init__(self):
+        self.playwright = None
+        self.browser = None
 
-#     def _get_service(self):
-#         service = Service()
-#         return service
+    async def _get_browser(self) -> PlaywrightBrowser:
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=False)
+        return self.browser
 
-#     def _get_options(self):
-#         # Navegation Options
-#         options = webdriver.ChromeOptions()
-#         options.add_argument("--start-maximized")
-#         options.add_argument("--disable-extensions")
-#         # options.add_argument('headless') #Comentar para ver como funciona
-#         return options
+    async def navigate_to_page(self, url: str):
+        browser = await self._get_browser()
+        page = await browser.new_page()
+        await page.goto(url)
+        return page
 
-#     def _get_browser(self):
-#         browser = webdriver.Chrome(
-#             service=Service(ChromeDriverManager().install()),
-#             options=self._get_options(),
-#         )
-#         return browser
-
-#     def search(self, keyword: str, url: str) -> WebDriver:
-#         """
-#         Funcion que realiza la busqueda en el navegador
-
-#         param:
-#             - url: Url a buscar
-#         """
-#         browser = self._get_browser()
-#         browser.get(url)
-#         return browser
+    async def close_browser(self):
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()

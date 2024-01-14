@@ -6,6 +6,7 @@ from app.services.scrap_services_edemsa import ScrapServicesEdemsa
 from supabase import Client, create_client
 import os
 from .utils.browser_invoker import InvokerBrowser
+import asyncio
 
 app = Celery("tasks", broker="redis://localhost:6379/0")
 
@@ -32,45 +33,75 @@ def scrap_ctnet_task(browser, client_number):
     print(browser)
     browser_web = invoker.get_command(browser)
     scrap_service = ScrapServicesCTNET(browser_web)
-    result = scrap_service.search(client_number)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(scrap_service.search(client_number))
+    print(result)
     return result
 
 
-# @app.task
-# def scrap_aysam_task(client_number):
-#     browser = Browser()
-#     scrap_service = ScrapServicesAySaM(browser)
-#     result = scrap_service.search(client_number)
-#     scrap_service.close_browser()
-#     return result
-
-
-# @app.task
-# def scrap_ecogas_task(client_number):
-#     browser = Browser()
-#     scrap_service = ScrapServicesEcogas(browser)
-#     result = scrap_service.search(client_number)
-#     scrap_service.close_browser()
-#     return result
-
-
-# @app.task
-# def scrap_edemsa_task(client_number):
-#     browser = Browser()
-#     scrap_service = ScrapServicesEdemsa(browser)
-#     result = scrap_service.search(client_number)
-#     scrap_service.close_browser()
-#     return result
+@app.task
+def scrap_aysam_task(browser, client_number):
+    invoker = InvokerBrowser()
+    browser = browser.lower()
+    print(browser)
+    browser_web = invoker.get_command(browser)
+    scrap_service = ScrapServicesAySaM(browser_web)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(scrap_service.search(client_number))
+    print(result)
+    return result
 
 
 @app.task
-def scrap_task(browser: str, user_id: str, property_id: int):
+def scrap_ecogas_task(browser, client_number):
+    invoker = InvokerBrowser()
+    browser = browser.lower()
+    print(browser)
+    browser_web = invoker.get_command(browser)
+    scrap_service = ScrapServicesEcogas(browser_web)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(scrap_service.search(client_number))
+    print(result)
+    return result
+
+
+@app.task
+def scrap_edemsa_task(browser, client_number):
+    invoker = InvokerBrowser()
+    browser = browser.lower()
+    print(browser)
+    browser_web = invoker.get_command(browser)
+    scrap_service = ScrapServicesEdemsa(browser_web)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(scrap_service.search(client_number))
+    print(result)
+    return result
+
+
+@app.task
+def scrap_task(browser: str, user_id: str, property_id: int, service: str):
     user_data = get_user_data(user_id, property_id)
 
-    if user_data:
-        internet_provider_id = user_data[0]["internet_provider_id"]
-        print(internet_provider_id)
-        result = scrap_ctnet_task(browser, internet_provider_id)
-        return result
+    if not user_data:
+        raise Exception("User not found")
+
+    if service == "aysam":
+        result = scrap_aysam_task.delay(browser, user_data[0]["water_provider_id"])
+    elif service == "ctnet":
+        result = scrap_ctnet_task.delay(browser, user_data[0]["internet_provider_id"])
+    elif service == "ecogas":
+        result = scrap_ecogas_task.apply_async(
+            args=[browser, user_data[0]["gas_provider_id"]], soft_time_limit=120
+        )
+    elif service == "edemsa":
+        result = scrap_edemsa_task.apply_async(
+            args=[browser, user_data[0]["electricity_provider_id"]], soft_time_limit=120
+        )
     else:
-        return None
+        raise Exception("Service not found")
+
+    return result

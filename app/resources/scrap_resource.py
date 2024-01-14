@@ -1,16 +1,16 @@
 from flask import Blueprint, jsonify
 from app import tasks
-import os
-from supabase import create_client, Client
 from celery.result import AsyncResult
 
 scrapblue = Blueprint("scrapblue", __name__, url_prefix="/")
 
 
-@scrapblue.route("/search/<browser>/<clientid>/<propertyid>/", methods=["GET"])
-def search(browser, clientid, propertyid):
+@scrapblue.route(
+    "/search/<browser>/<clientid>/<propertyid>/<service>/", methods=["GET"]
+)
+def search(browser, clientid, propertyid, service):
     """
-    Funcion llamada por request GET a la ruta /api/v1/search/<browser>/<propertyid>/<clientid>/
+    Funcion llamada por request GET a la ruta /api/v1/search/<browser>/<propertyid>/<clientid>/<service>/
 
     args:
         - browser: Indica el navegador a utilizar para la busqueda
@@ -20,7 +20,7 @@ def search(browser, clientid, propertyid):
         - resp: Deuda si / no
     """
     # Iniciar la tarea asincrónica
-    task = tasks.scrap_task.delay(browser, propertyid, clientid)
+    task = tasks.scrap_task.delay(browser, propertyid, clientid, service)
 
     # Obtener el ID de la tarea
     task_id = task.id
