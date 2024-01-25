@@ -26,3 +26,5 @@ venv/
 # Archivos de configuración específicos del sistema operativo
 .DS_Store
 Thumbs.db
+
+dump.rdb

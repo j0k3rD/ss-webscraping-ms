@@ -83,7 +83,7 @@ def scrap_edemsa_task(browser, client_number):
 
 
 @app.task
-def scrap_task(browser: str, user_id: str, property_id: int, service: str):
+def scrap_by_service(browser: str, user_id: str, property_id: str, service: str):
     user_data = get_user_data(user_id, property_id)
 
     if not user_data:
@@ -104,4 +104,28 @@ def scrap_task(browser: str, user_id: str, property_id: int, service: str):
     else:
         raise Exception("Service not found")
 
+    return result
+
+
+@app.task
+def scrap_all(browser: str, user_id: str, property_id: str):
+    user_data = get_user_data(user_id, property_id)
+
+    result = None
+
+    if not user_data:
+        raise Exception("User not found")
+
+    if user_data[0]["water_provider_id"]:
+        result = scrap_aysam_task.delay(browser, user_data[0]["water_provider_id"])
+    if user_data[0]["internet_provider_id"]:
+        result = scrap_ctnet_task.delay(browser, user_data[0]["internet_provider_id"])
+    if user_data[0]["gas_provider_id"]:
+        result = scrap_ecogas_task.apply_async(
+            args=[browser, user_data[0]["gas_provider_id"]], soft_time_limit=120
+        )
+    if user_data[0]["electricity_provider_id"]:
+        result = scrap_edemsa_task.apply_async(
+            args=[browser, user_data[0]["electricity_provider_id"]], soft_time_limit=120
+        )
     return result
