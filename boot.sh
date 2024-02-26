@@ -1,3 +1,4 @@
+#!/bin/bash
 source bin/activate
 
 if ! command -v playwright &> /dev/null

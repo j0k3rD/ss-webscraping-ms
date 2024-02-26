@@ -11,12 +11,6 @@ services:
     command: redis-server /data/redis.conf #--requirepass ${REDIS_PASSWORD}
     networks:
       - red
-    # labels:
-        # - "traefik.enable=true"
-        # - "traefik.tcp.routers.redis.rule=HostSNI(`*`)"
-        # - "traefik.tcp.services.redis.loadbalancer.server.port=6379"
-        # - "traefik.tcp.routers.redis.entrypoints=redis"
-        #- "traefik.tcp.routers.redis.tls=true"  #* Sirve para hacer un handshake con el proxy. Probar primero sin hacerlo.
 
 networks:
     red:

@@ -5,14 +5,15 @@ ENV PATH=$PATH:/home/app/.local/bin
 
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+COPY requirements_dev.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ./main /app/main
-COPY ./config.py /app/
+COPY ./app /app/app/
+COPY ./install.sh /app/
+COPY ./boot.sh /app/
 COPY ./run.py /app/
-COPY ./tasks.py /app/
+
+RUN chmod +x /app/install.sh /app/boot.sh
+RUN /app/./install.sh
 
 EXPOSE 5000
-
-CMD [ "python3", "run.py" ]

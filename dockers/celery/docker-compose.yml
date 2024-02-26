@@ -3,17 +3,12 @@ version: "3.3"
 services:
   celery:
     container_name: celery
-    image: celery:4.0.2
-    # command: celery -A tasks worker --loglevel=info
-    volumes:
-      - .:/app
-    ports:
-      - "5555:5555"
-    environment:
-      - DEBUG=1
-      - ALLOWED_HOSTS=*
-    depends_on:
-      - redis
+    image: ws-service:v0.0.1
+    command: ["celery", "-A", "app.tasks", "worker", "--loglevel=info"]
+    # depends_on:
+      # - redis
+    env_file:
+      - .env
 
 networks:
     red:
