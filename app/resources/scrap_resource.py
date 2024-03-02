@@ -20,16 +20,12 @@ def search_by_service(browser, clientid, propertyid, service):
     return:
         - resp: Deuda si / no
     """
-    # Iniciar la tarea asincrónica
     task = tasks.scrap_by_service.delay(browser, clientid, propertyid, service)
 
-    # Obtener el ID de la tarea
     task_id = task.id
 
-    # Esperar hasta que la tarea se complete
     task_result = AsyncResult(task_id).get()
 
-    # Comprobar el resultado y devolver una respuesta JSON
     if task_result:
         return jsonify({"deuda": "si"})
     else:
@@ -48,16 +44,12 @@ def search_all(browser, clientid, propertyid):
     return:
         - resp: Deuda si / no
     """
-    # Iniciar la tarea asincrónica
     task = tasks.scrap_all.delay(browser, clientid, propertyid)
 
-    # Obtener el ID de la tarea
     task_id = task.id
 
-    # Esperar hasta que la tarea se complete
     task_result = AsyncResult(task_id).get()
 
-    # Comprobar el resultado y devolver una respuesta JSON
     if task_result:
         return jsonify({"deuda": "si"})
     else:

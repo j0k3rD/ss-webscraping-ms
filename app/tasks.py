@@ -1,8 +1,8 @@
 from celery import Celery
-from app.services.scrap_services_aysam import ScrapServicesAySaM
-from app.services.scrap_service_ctnet import ScrapServicesCTNET
-from app.services.scrap_services_ecogas import ScrapServicesEcogas
-from app.services.scrap_services_edemsa import ScrapServicesEdemsa
+from app.services.scrap_debt_services_aysam import ScrapDebtServicesAySaM
+from app.services.scrap_debt_service_ctnet import ScrapDebtServicesCTNET
+from app.services.scrap_debt_services_ecogas import ScrapDebtServicesEcogas
+from app.services.scrap_debt_services_edemsa import ScrapDebtServicesEdemsa
 from supabase import Client, create_client
 import os
 from .utils.browser_invoker import InvokerBrowser
@@ -17,10 +17,10 @@ supabase: Client = create_client(url, key)
 
 def get_user_data(user_id: str, property_id: str):
     result = (
-        supabase.table("providers_ids")
+        supabase.table("property")
         .select("*")
         .eq("user_id", user_id)
-        .eq("property_id", property_id)
+        .eq("id", property_id)
         .execute()
     )
     return result.data
@@ -32,7 +32,7 @@ def scrap_ctnet_task(browser, client_number):
     browser = browser.lower()
     print(browser)
     browser_web = invoker.get_command(browser)
-    scrap_service = ScrapServicesCTNET(browser_web)
+    scrap_service = ScrapDebtServicesCTNET(browser_web)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(client_number))
@@ -46,7 +46,7 @@ def scrap_aysam_task(browser, client_number):
     browser = browser.lower()
     print(browser)
     browser_web = invoker.get_command(browser)
-    scrap_service = ScrapServicesAySaM(browser_web)
+    scrap_service = ScrapDebtServicesAySaM(browser_web)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(client_number))
@@ -60,7 +60,7 @@ def scrap_ecogas_task(browser, client_number):
     browser = browser.lower()
     print(browser)
     browser_web = invoker.get_command(browser)
-    scrap_service = ScrapServicesEcogas(browser_web)
+    scrap_service = ScrapDebtServicesEcogas(browser_web)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(client_number))
@@ -74,7 +74,7 @@ def scrap_edemsa_task(browser, client_number):
     browser = browser.lower()
     print(browser)
     browser_web = invoker.get_command(browser)
-    scrap_service = ScrapServicesEdemsa(browser_web)
+    scrap_service = ScrapDebtServicesEdemsa(browser_web)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(client_number))
