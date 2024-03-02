@@ -28,3 +28,13 @@ venv/
 Thumbs.db
 
 dump.rdb
+
+lib64
+
+pyvenv.cfg
+
+bin
+
+lib
+
+include
