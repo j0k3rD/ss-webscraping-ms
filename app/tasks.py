@@ -82,6 +82,7 @@ def scrap_edemsa_task(browser, client_number):
     return result
 
 
+#!TODO: Scrapeo solamente cuando se crea un nuevo client_number, sino traer ultimo scrapeo del mes de la db.
 @app.task
 def scrap_by_service(browser: str, user_id: str, property_id: str, service: str):
     user_data = get_user_data(user_id, property_id)
@@ -95,11 +96,11 @@ def scrap_by_service(browser: str, user_id: str, property_id: str, service: str)
         result = scrap_ctnet_task.delay(browser, user_data[0]["internet_provider_id"])
     elif service == "ecogas":
         result = scrap_ecogas_task.apply_async(
-            args=[browser, user_data[0]["gas_provider_id"]], soft_time_limit=120
+            args=[browser, user_data[0]["gas_provider_id"]], soft_time_limit=30
         )
     elif service == "edemsa":
         result = scrap_edemsa_task.apply_async(
-            args=[browser, user_data[0]["electricity_provider_id"]], soft_time_limit=120
+            args=[browser, user_data[0]["electricity_provider_id"]], soft_time_limit=30
         )
     else:
         raise Exception("Service not found")

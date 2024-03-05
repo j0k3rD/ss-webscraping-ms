@@ -6,11 +6,11 @@ services:
     image: ws-service:v0.0.1
     command: ["celery", "-A", "app.tasks", "worker", "--loglevel=info"]
     # depends_on:
-      # - redis
+    # - redis
     env_file:
       - .env
 
 networks:
-    red:
-      external: true
-      driver: bridge
+  red:
+    external: true
+    driver: bridge
