@@ -5,3 +5,4 @@ pytest-playwright===0.4.3
 anticaptchaofficial==1.0.59
 supabase==2.3.3
 python-dotenv==1.0.1
+pdfplumber==0.11.0
