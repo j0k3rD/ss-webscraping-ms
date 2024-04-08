@@ -4,6 +4,12 @@ from ..data.constants import URL_ELECTRICITY_PROVIDER, NO_DEBT, DEBT
 from ..utils.scrap_utils.save_pdf_urls import save_pdf_urls
 from playwright.async_api import TimeoutError
 import os
+import pdfplumber
+import requests
+import tempfile
+import shutil
+import re
+import asyncio
 
 
 class ScrapDebtServicesEdemsa:
@@ -12,6 +18,7 @@ class ScrapDebtServicesEdemsa:
         self.solver = recaptchaV2Proxyless()
         self.solver.set_verbose(1)
         self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
+        self.global_bills = []
 
     async def search(self, client_number):
         try:
@@ -68,7 +75,6 @@ class ScrapDebtServicesEdemsa:
             state="visible",
         )
         pagination_index = 0
-        all_pdf_urls = []
         while True:
             await page.wait_for_selector(".pagination", state="visible")
             pagination_elements = await page.query_selector_all(
@@ -78,11 +84,22 @@ class ScrapDebtServicesEdemsa:
                 break
             await pagination_elements[pagination_index].click()
             await page.wait_for_selector("#tfactura", state="visible")
-            pdf_urls = await self.download_bills(page)
-            all_pdf_urls.extend(pdf_urls)
+            pdf_urls = await self.get_bills(page)
+            self.global_bills.extend(pdf_urls)
             pagination_index += 1
-        # Guarda todas las URLs después del bucle
-        await save_pdf_urls(all_pdf_urls, client_number)
+
+        try:
+            temp_dir = await self.download_pdf(self.global_bills)
+            all_data = []
+            files = await self.get_files_in_directory(temp_dir)
+            for file in files:
+                pdf_path = os.path.join(temp_dir, file)
+                await self.extract_pdf_data(pdf_path, all_data)
+            # Guarda todas las URLs después del bucle
+            await save_pdf_urls(all_data, client_number)
+        finally:
+            shutil.rmtree(temp_dir)
+
         await page.click("#impagas-tab")
         try:
             await page.wait_for_selector("#tfacturasImpagas", timeout=10000)
@@ -100,7 +117,7 @@ class ScrapDebtServicesEdemsa:
             await page.close()
             return NO_DEBT
 
-    async def download_bills(self, page: Page):
+    async def get_bills(self, page: Page):
         await page.wait_for_selector("#fact_pagas_fuera_oficina", state="visible")
         pdf_elements = await page.query_selector_all("#fact_pagas_fuera_oficina")
         pdf_urls = await page.evaluate(
@@ -108,3 +125,27 @@ class ScrapDebtServicesEdemsa:
             pdf_elements,
         )
         return pdf_urls
+
+    async def download_pdf(self, bills: list[str]):
+        c = 1
+        temp_dir = tempfile.mkdtemp()
+        for bill in bills:
+            print(bill)
+            response = requests.get(bill)
+            print(response.text)
+            with open(os.path.join(temp_dir, f"{c}.pdf"), "wb") as file:
+                file.write(response.content)
+                c += 1
+        return temp_dir
+
+    async def get_files_in_directory(self, directory):
+        """
+        Obtiene la lista de archivos en un directorio dado.
+        """
+        return os.listdir(directory)
+
+    async def extract_pdf_data(self, pdf_path, all_data: list[str]):
+        with pdfplumber.open(pdf_path) as pdf:
+            page = pdf.pages[0]
+            text = page.extract_text()
+        return all_data.append(text)

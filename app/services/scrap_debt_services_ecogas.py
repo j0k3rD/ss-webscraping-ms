@@ -1,5 +1,5 @@
 from playwright.async_api import Page
-from anticaptchaofficial.recaptchav2proxyless import *
+from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
 import os
 from urllib.parse import urljoin
 from ..data.constants import URL_GAS_PROVIDER, NO_DEBT, DEBT

@@ -26,9 +26,15 @@ class ScrapDebtServicesCTNET:
         return result
 
     async def parser(self, page: Page, client_number):
+        # Quitar modal
+        await page.click("#modalCookieSucursal .btn-close")
+
         await page.fill("#numero-cliente", str(client_number))
 
         await page.click(".btn-ctnet")
+
+        # Quitar modal
+        await page.click("#modalCookieSucursal .btn-close")
 
         await page.click(".btn-seleccionar-cliente")
 
@@ -47,11 +53,9 @@ class ScrapDebtServicesCTNET:
         await page.wait_for_selector("#boton-tab-pagas")
         await page.click("#boton-tab-pagas")
 
-        await page.wait_for_selector("#tbody-facturas-pagas .td-facturas a")
+        await page.wait_for_selector("#tbody-facturas-pagas .td-center a")
 
-        pdf_links = await page.query_selector_all(
-            "#tbody-facturas-pagas .td-facturas a"
-        )
+        pdf_links = await page.query_selector_all("#tbody-facturas-pagas .td-center a")
 
         pdf_urls = [await link.get_attribute("href") for link in pdf_links]
 

@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 from app import tasks
 from celery.result import AsyncResult
 
-scrapblue = Blueprint("scrapblue", __name__, url_prefix="/")
+scrapblue = Blueprint("scrapblue", __name__, url_prefix="/scrap")
 
 
 @scrapblue.route(
@@ -24,12 +24,7 @@ def search_by_service(browser, clientid, propertyid, service):
 
     task_id = task.id
 
-    task_result = AsyncResult(task_id).get()
-
-    if task_result:
-        return jsonify({"deuda": "si"})
-    else:
-        return jsonify({"deuda": "no"})
+    AsyncResult(task_id).get()
 
 
 @scrapblue.route("/search/<browser>/<clientid>/<propertyid>", methods=["GET"])
@@ -48,9 +43,4 @@ def search_all(browser, clientid, propertyid):
 
     task_id = task.id
 
-    task_result = AsyncResult(task_id).get()
-
-    if task_result:
-        return jsonify({"deuda": "si"})
-    else:
-        return jsonify({"deuda": "no"})
+    AsyncResult(task_id).get()

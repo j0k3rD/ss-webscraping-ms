@@ -1,14 +1,18 @@
 from flask import Flask
 from dotenv import load_dotenv
 import os
+from flask_wtf import CSRFProtect
+
 
 load_dotenv()
 
 
 def create_app():
     app = Flask(__name__)
+    csrf = CSRFProtect()
+    csrf.init_app(app)  # Compliant
 
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 
     from app.resources.home_resource import home
     from app.resources.scrap_resource import scrapblue

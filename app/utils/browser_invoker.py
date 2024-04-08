@@ -16,5 +16,5 @@ class InvokerBrowser(Invoker):
     def get_command(self, command_name):
         command = self.__list_commands.get(command_name)
         if not command:
-            raise Exception("Command not found")
+            raise ValueError("Command not found")
         return command
