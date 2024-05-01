@@ -1,0 +1,18 @@
+services:
+
+  ss-web:
+    ports:
+      - 8004:8000
+    command: uvicorn main:app --host 0.0.0.0 --reload
+    volumes:
+      - ./src:/usr/src/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    # depends_on:
+      # - redis
+
+networks:
+  red:
+    external: true
+    driver: bridge

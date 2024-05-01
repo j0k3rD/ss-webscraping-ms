@@ -1,6 +1,0 @@
-projectKey=CdS-2024
-serverUrl=http://localhost:9000
-serverVersion=10.4.1.88267
-dashboardUrl=http://localhost:9000/dashboard?id=CdS-2024
-ceTaskId=bfe29820-bb64-4e7c-8c7d-c9510d2b90b1
-ceTaskUrl=http://localhost:9000/api/ce/task?id=bfe29820-bb64-4e7c-8c7d-c9510d2b90b1

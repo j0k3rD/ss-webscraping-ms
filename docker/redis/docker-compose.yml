@@ -1,0 +1,20 @@
+services:
+
+  redis:
+    # container_name: redis
+    image: redis:7.2.4
+
+    volumes:
+      - ./_data:/data
+      - ./_data/redis.conf:/data/redis.conf
+
+    command: redis-server /data/redis.conf
+
+    networks:
+      - red
+
+
+networks:
+  red:
+    external: true
+    driver: bridge

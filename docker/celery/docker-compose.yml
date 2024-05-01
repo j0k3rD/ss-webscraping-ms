@@ -1,0 +1,19 @@
+services:
+
+  celery:
+    container_name: celery
+    image: ss-web:v0.0.1
+    command: ["celery", "-A", "app.tasks", "worker", "--loglevel=info", "--logfile=logs/celery.log"]
+    volumes:
+      - ./src:/usr/src/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    # depends_on:
+      # - web
+      # - redis
+
+networks:
+  red:
+    external: true
+    driver: bridge

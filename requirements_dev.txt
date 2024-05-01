@@ -1,9 +1,0 @@
-celery==5.3.6
-redis==5.0.1
-Flask==3.0.0
-pytest-playwright===0.4.3
-anticaptchaofficial==1.0.59
-supabase==2.3.3
-python-dotenv==1.0.1
-pdfplumber==0.11.0
-Flask-WTF===1.2.1
