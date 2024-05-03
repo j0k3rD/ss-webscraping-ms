@@ -1,41 +1,93 @@
+import httpx, json, os, asyncio
 from playwright.async_api import Page
-from urllib.parse import urlparse, urlunparse
-# from ..utils.scrap_utils.save_pdf_urls import save_pdf_urls
+from urllib.parse import urlparse, urlunparse, urljoin
+from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
+import pdfplumber
+from ..utils.scrap_utils.save_bills import save_bills
+from ..utils.scrap_utils.get_selector import get_selector
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class ScrapService:
     def __init__(self, browser):
         self.browser = browser
+        self.solver = recaptchaV2Proxyless()
+        self.solver.set_verbose(1)
+        self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
+        self.global_bills = []
 
     async def search(self, data):
         url: str = data['service']['scrapping_config']['url']
-        client_number: str = data['provider_client']['client_code']
-        sequence: list = data['service']['scrapping_config']['sequence']
-        captcha: bool = data['service']['scrapping_config']['captcha'] #TODO: Implementar captcha
+        captcha: bool = data['service']['scrapping_config']['captcha']
 
         page = await self.browser.navigate_to_page(url)
-        result = await self.parser(page, sequence, client_number)
+
+        if captcha:
+                captcha_sequence = data['service']['scrapping_config']['captcha_sequence']
+                try: 
+                    result = await self.parser(data, page, captcha_sequence)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    await page.close()
+                    return await self.search(data)
+        else:
+            try:
+                result = await self.parser(data, page)
+            except Exception as e:
+                print(f"Error: {e}")
+                await page.close()
+                return await self.search(data)
         await page.close()
         return result
 
-    # async def download_bills(self, page: Page, client_number):
-    #     pdf_links = await self.get_pdf_links(page)
-    #     pdf_urls = [await link.get_attribute("href") for link in pdf_links]
-    #     pdf_urls = self.format_pdf_urls(pdf_urls)
-    #     await save_pdf_urls(pdf_urls, client_number)
-
-    async def parser(self, page: Page, sequence, client_number):
+    async def parser(self, data, page: Page, captcha_sequence=None):
         client_number_index = 0
+        client_number: str = data['provider_client']['client_code']
+        provider_client_id: str = data['provider_client']['id']
+        sequence: list = data['service']['scrapping_config']['sequence']
+        
+        try:
+            if captcha_sequence:
+                
+                page.on("dialog", self.handle_dialog)
+                page.on("download", self.handle_download)
+
+                element_type = captcha_sequence[0]['element_type']
+                selector = get_selector(captcha_sequence[0])
+                sitekey_element_content = captcha_sequence[1]['content']
+                captcha_button_content = captcha_sequence[2]['captcha_button_content']
+
+                await page.fill(selector, str(client_number))
+                sitekey_element = await page.query_selector(sitekey_element_content)
+                sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
+
+                try:
+                    await self.solve_captcha(data, page, sitekey_clean, captcha_button_content)
+                except TimeoutError:
+                    print("TimeoutError SCRAP. Reintentando...")
+                    await page.close()
+                    return await self.search(data)
+        except KeyError:
+            pass
+
         for action in sequence:
             element_type = action['element_type']
-            selector = self.get_selector(action)
-            query_all = action['query']
+            selector = get_selector(action)
+            query = action['query']
             extra = action.get('extra', None)
+            redirect = action.get('redirect', None)
+            form = action.get('form', None)
 
             await page.wait_for_selector(selector)
 
             if element_type == 'modal':
-                await page.click(selector)
+                try:
+                    await page.click(selector)
+                except Exception:
+                    print('modal not found')
+
             elif element_type == 'input':
                 try:
                     if action['size']:
@@ -45,21 +97,49 @@ class ScrapService:
                 except KeyError:
                     input_value = client_number
                 await page.fill(selector, input_value)
-            elif element_type in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'table', 'tbody', 'td', 'a']:
-                if query_all:
+
+            elif element_type in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'table', 'tbody', 'td', 'a', 'ul']:
+                
+                if query and redirect:
+                    link = await page.query_selector_all(selector)
+                    href = await link.get_attribute('href')
+                    absolute_url = urljoin(page.url, href)
+                    await page.goto(absolute_url)
+
+                elif query and form:
+                    elements = await page.query_selector_all(selector)
+                    for i in range(0, 6, 2):
+                        td = elements[i]
+                        form = await td.query_selector("form")
+                        await form.dispatch_event("submit")
+                        await asyncio.sleep(12)
+
+                elif query:
                     elements = await page.query_selector_all(selector)
                     if extra == 'map':
                         elements_href = await page.eval_on_selector_all(selector, 'links => links.map(link => link.href)')
+                    elif extra == 'evaluate':
+                        elements = await page.query_selector_all(selector)
+                        elements_href = await page.evaluate(
+                            """elements => elements.map(element => element.href)""",
+                            elements,
+                        )
                     else:
                         elements_href = [await element.get_attribute('href') for element in elements]
+                        
                     parsed_url = urlparse(page.url)
                     base_url = urlunparse((parsed_url.scheme, parsed_url.netloc, "", "", "", ""))
+                    
                     if extra == 'map':
                         elements_formatted = [{'url': href} for href in elements_href]
+                    elif extra == 'evaluate':
+                        elements_formatted = [{'url': href} for href in elements_href if href is not None]
                     else:
-                        elements_formatted = [{'url': base_url + href} for href in elements_href]
-                    print(elements_formatted)
-                    return elements_formatted 
+                        elements_formatted = [{'url': urljoin(base_url, href)} for href in elements_href if href is not None]
+
+                    await save_bills(provider_client_id, elements_formatted)
+                    save_bills_called = True
+
                 else:
                     await page.wait_for_selector(selector)
             elif element_type == 'button':
@@ -68,17 +148,42 @@ class ScrapService:
                 await page.wait_for_selector(selector)
             else:
                 print('element_type not found')
+
+        if captcha_sequence and not save_bills_called:
+            await save_bills(provider_client_id, self.global_bills)
+        else:
+            pass
+
         await page.close()
 
-    def get_selector(self, element):
-        print('element', element)
-        component_type = element['component_type']
 
-        if component_type == 'id':
-            selector = f"#{element['content']}"
-        elif component_type == 'class':
-            selector = f".{element['content']}"
-        else:
-            selector = element['content']
-        print('selector', selector)
-        return selector
+    async def solve_captcha(self, data, page, sitekey_clean, captcha_button_content):
+        try:
+            self.solver.set_website_url(page.url)
+            self.solver.set_website_key(sitekey_clean)
+            g_response = self.solver.solve_and_return_solution()
+            if g_response != 0:
+                await page.evaluate(
+                    f"document.getElementById('g-recaptcha-response').innerHTML = '{g_response}'"
+                )
+                await page.click(captcha_button_content)
+            else:
+                print("task finished with error " + self.solver.error_code)
+        except Exception as e:
+            print("TimeoutError SOLVE CAPTCHA. Reintentando...")
+            await page.close()
+            return await self.search(data)
+
+    async def handle_dialog(self, dialog):
+        print(f"Dialog message: {dialog.message}")
+        await dialog.accept()
+
+    async def handle_download(self, download):
+        print(f"Descargando: {download.suggested_filename}")
+        path = await download.path()
+        print(f"Guardado en: {path}")
+
+        with pdfplumber.open(path) as pdf:
+            pages = pdf.pages
+            text = "".join(page.extract_text() for page in pages)
+        self.global_bills.append(text)

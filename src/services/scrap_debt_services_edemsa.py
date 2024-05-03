@@ -1,7 +1,7 @@
 from playwright.async_api import Page
 from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
 from ..data.constants import URL_ELECTRICITY_PROVIDER, NO_DEBT, DEBT
-from ..utils.scrap_utils.save_pdf_urls import save_pdf_urls
+from ..utils.scrap_utils.save_bills import save_pdf_urls
 from playwright.async_api import TimeoutError
 import os
 import pdfplumber
@@ -12,38 +12,39 @@ import re
 import asyncio
 
 
-class ScrapDebtServicesEdemsa:
-    def __init__(self, browser):
-        self.browser = browser
-        self.solver = recaptchaV2Proxyless()
-        self.solver.set_verbose(1)
-        self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
-        self.global_bills = []
+# class ScrapDebtServicesEdemsa:
+#     def __init__(self, browser):
+#         self.browser = browser
+#         self.solver = recaptchaV2Proxyless()
+#         self.solver.set_verbose(1)
+#         self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
+#         self.global_bills = []
 
-    async def search(self, client_number):
-        try:
-            response = await self.scrap(client_number)
-            return response
-        except TimeoutError:
-            print("TimeoutError SEARCH. Reintentando...")
-            return await self.search(client_number)
+    # async def search(self, client_number):
+    #     try:
+    #         response = await self.scrap(client_number)
+    #         return response
+    #     except TimeoutError:
+    #         print("TimeoutError SEARCH. Reintentando...")
+    #         return await self.search(client_number)
 
-    async def scrap(self, client_number):
-        page = await self.browser.navigate_to_page(URL_ELECTRICITY_PROVIDER)
-        await page.fill("#nic", str(client_number))
-        sitekey_element = await page.query_selector(
-            '//*[@id="consultaFacturas"]/div[2]/div'
-        )
-        sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
+    # async def scrap(self, client_number):
+    #     page = await self.browser.navigate_to_page(URL_ELECTRICITY_PROVIDER)
+    #     await page.fill("#nic", str(client_number))
+    #     sitekey_element = await page.query_selector(
+    #         '//*[@id="consultaFacturas"]/div[2]/div'
+    #     )
+    #     sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
+
         # Solve captcha
-        await self.solve_captcha(page, sitekey_clean, client_number)
-        try:
-            response_scrap = await self.process_page(page, client_number)
-            return response_scrap
-        except TimeoutError:
-            print("TimeoutError SCRAP. Reintentando...")
-            await page.close()
-            return await self.scrap(client_number)
+        # await self.solve_captcha(page, sitekey_clean, client_number)
+        # try:
+        #     response_scrap = await self.process_page(page, client_number)
+        #     return response_scrap
+        # except TimeoutError:
+        #     print("TimeoutError SCRAP. Reintentando...")
+        #     await page.close()
+        #     return await self.scrap(client_number)
 
     async def solve_captcha(self, page, sitekey_clean, client_number):
         try:
