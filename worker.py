@@ -2,7 +2,6 @@ import os, asyncio
 from celery import Celery
 from src.utils.browser_invoker import InvokerBrowser
 from src.services.scrap_service import ScrapService
-from src.utils.get_scrap_config import util
 from fastapi import Depends
 
 

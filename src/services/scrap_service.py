@@ -1,11 +1,13 @@
-import httpx, json, os, asyncio
+import os, asyncio
 from playwright.async_api import Page
+from playwright._impl._errors import TargetClosedError
 from urllib.parse import urlparse, urlunparse, urljoin
 from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
 import pdfplumber
 from ..utils.scrap_utils.save_bills import save_bills
 from ..utils.scrap_utils.get_selector import get_selector
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -17,6 +19,7 @@ class ScrapService:
         self.solver.set_verbose(1)
         self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
         self.global_bills = []
+        self.save_bills_called = False
 
     async def search(self, data):
         url: str = data['service']['scrapping_config']['url']
@@ -72,7 +75,7 @@ class ScrapService:
         except KeyError:
             pass
 
-        for action in sequence:
+        for i, action in enumerate(sequence):
             element_type = action['element_type']
             selector = get_selector(action)
             query = action['query']
@@ -80,7 +83,16 @@ class ScrapService:
             redirect = action.get('redirect', None)
             form = action.get('form', None)
 
-            await page.wait_for_selector(selector)
+            try:
+                await page.wait_for_selector(selector)
+            except Exception:
+                if i == len(sequence) - 1:
+                    print('Last element not found, terminating process')
+                    return
+                else:
+                    print('Element not found, skipping to next action')
+                    continue 
+
 
             if element_type == 'modal':
                 try:
@@ -104,7 +116,7 @@ class ScrapService:
                     link = await page.query_selector_all(selector)
                     href = await link.get_attribute('href')
                     absolute_url = urljoin(page.url, href)
-                    await page.goto(absolute_url)
+                    await page.goto(absolute_url, wait_until='load')
 
                 elif query and form:
                     elements = await page.query_selector_all(selector)
@@ -118,12 +130,6 @@ class ScrapService:
                     elements = await page.query_selector_all(selector)
                     if extra == 'map':
                         elements_href = await page.eval_on_selector_all(selector, 'links => links.map(link => link.href)')
-                    elif extra == 'evaluate':
-                        elements = await page.query_selector_all(selector)
-                        elements_href = await page.evaluate(
-                            """elements => elements.map(element => element.href)""",
-                            elements,
-                        )
                     else:
                         elements_href = [await element.get_attribute('href') for element in elements]
                         
@@ -132,24 +138,28 @@ class ScrapService:
                     
                     if extra == 'map':
                         elements_formatted = [{'url': href} for href in elements_href]
-                    elif extra == 'evaluate':
-                        elements_formatted = [{'url': href} for href in elements_href if href is not None]
                     else:
                         elements_formatted = [{'url': urljoin(base_url, href)} for href in elements_href if href is not None]
 
                     await save_bills(provider_client_id, elements_formatted)
-                    save_bills_called = True
+                    self.save_bills_called = True
 
                 else:
                     await page.wait_for_selector(selector)
             elif element_type == 'button':
+                await page.wait_for_selector(selector)
                 await page.click(selector)
+            elif element_type == 'buttons':
+                buttons = await page.query_selector_all(selector)
+                for button in buttons:
+                    await button.click()
+                    time.sleep(1)
             elif element_type == 'tabla':
                 await page.wait_for_selector(selector)
             else:
                 print('element_type not found')
 
-        if captcha_sequence and not save_bills_called:
+        if captcha_sequence and not self.save_bills_called:
             await save_bills(provider_client_id, self.global_bills)
         else:
             pass
@@ -180,10 +190,15 @@ class ScrapService:
 
     async def handle_download(self, download):
         print(f"Descargando: {download.suggested_filename}")
-        path = await download.path()
+        try:
+            path = await download.path()
+        except TargetClosedError:
+            print("La página, el contexto o el navegador se hanado antes de que se pudiera acceder a la ruta del archivo descargado.")
+            return
         print(f"Guardado en: {path}")
 
         with pdfplumber.open(path) as pdf:
             pages = pdf.pages
             text = "".join(page.extract_text() for page in pages)
-        self.global_bills.append(text)
+            
+        self.global_bills.append({'url': download.suggested_filename, 'content': text})
