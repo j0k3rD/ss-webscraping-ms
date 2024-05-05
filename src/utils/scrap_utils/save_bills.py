@@ -1,5 +1,4 @@
 import json, httpx
-from datetime import datetime
 
 BASE_URL = "http://localhost:5000"
 
@@ -23,22 +22,17 @@ async def save_bills(provider_client_id, bills):
     # Buscar scrapped_data_id con provider_client_id
     scrapped_data_id = await make_request('get', f"{BASE_URL}/scrapped-datas/provider-client/{provider_client_id}")
 
-    # print('BILSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS',data['bills'])
     if scrapped_data_id:
-
         # Comparar las facturas que ya están en la base de datos con las nuevas facturas
         bills_to_save = []
         for bill in bills:
             if json.dumps(bill) not in [json.dumps(existing_bill) for existing_bill in scrapped_data_id['bills']]:
                 bills_to_save.append(bill)
-
         # Crear data
         data = {
             "provider_client_id": provider_client_id,
             "bills": bills_to_save,
-            # "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-
         response = await make_request('put', f"{BASE_URL}/scrapped-datas/{scrapped_data_id['id']}", data)
         if response:
             print("Bills saved successfully")
