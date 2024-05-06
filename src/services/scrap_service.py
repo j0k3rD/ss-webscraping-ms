@@ -4,7 +4,7 @@ from playwright._impl._errors import TargetClosedError
 from urllib.parse import urlparse, urlunparse, urljoin
 from anticaptchaofficial.recaptchav2proxyless import recaptchaV2Proxyless
 import pdfplumber
-from ..utils.scrap_utils.save_bills import save_bills
+from ..utils.scrap_utils.req_backend import save_bills
 from ..utils.scrap_utils.get_selector import get_selector
 from dotenv import load_dotenv
 import time

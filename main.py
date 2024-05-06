@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from worker import scrap_task
+from worker import scrap_task, extract_data_task
+from celery import chain
 
 description = """
 SmartServices API helps you do awesome stuff. 🚀
@@ -11,7 +12,17 @@ app = FastAPI(
     version="0.0.1",
 )
 
+
 @app.post("/scrap", tags=["scrap"])
-def scrap_debt(data: dict):
-    task = scrap_task.delay(data)
-    return {"task_id": task.id}
+async def scrap(data: dict):
+    """
+    Scrap data from a website.
+    """
+    scrap_tasks = scrap_task.delay(data)
+    scrap_tasks.get()
+    extract_tasks = extract_data_task.delay(data)
+
+    return {
+        "scrap_task_id": scrap_tasks.id,
+        "extract_task_id": extract_tasks.id
+    }

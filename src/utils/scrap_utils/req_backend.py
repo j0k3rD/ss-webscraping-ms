@@ -1,6 +1,8 @@
-import json, httpx
+import json
+import httpx
 
 BASE_URL = "http://localhost:5000"
+
 
 async def make_request(method, url, data=None):
     async with httpx.AsyncClient() as client:
@@ -13,31 +15,44 @@ async def make_request(method, url, data=None):
             return None
         return response.json()
 
+
 async def save_bills(provider_client_id, bills):
     # Buscar provider_client_id
     provider_client = await make_request('get', f"{BASE_URL}/provider-clients/{provider_client_id}")
     if not provider_client:
         return
-
     # Buscar scrapped_data_id con provider_client_id
     scrapped_data_id = await make_request('get', f"{BASE_URL}/scrapped-datas/provider-client/{provider_client_id}")
 
     if scrapped_data_id:
+        consumption_data = scrapped_data_id.get('consumption_data', [])
         # Comparar las facturas que ya están en la base de datos con las nuevas facturas
         bills_to_save = []
         for bill in bills:
             if json.dumps(bill) not in [json.dumps(existing_bill) for existing_bill in scrapped_data_id['bills']]:
                 bills_to_save.append(bill)
+
+        if not bills_to_save:
+            print("No new bills to save")
+            return
+        
         # Crear data
         data = {
             "provider_client_id": provider_client_id,
             "bills": bills_to_save,
+            "consumption_data": consumption_data
         }
         response = await make_request('put', f"{BASE_URL}/scrapped-datas/{scrapped_data_id['id']}", data)
-        if response:
+        if not response:
+            print("Failed to save bills")
+        else:
             print("Bills saved successfully")
     else:
         # Crear scrapped_data
+        data = {
+            "provider_client_id": provider_client_id,
+            "bills": bills
+        }
         response = await make_request('post', f"{BASE_URL}/scrapped-data", data)
         if response:
             print("Scrapped_data created successfully")
