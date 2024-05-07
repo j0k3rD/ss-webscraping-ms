@@ -1,9 +1,15 @@
 import re
 
-date_regex = [re.compile(r"Vto.:\s?(\d{2}/\d{2}/\d{4})"), re.compile(r"al:\s?(\d{2}/\d{2}/\d{4})")]
-address_regex = [re.compile(r"Domicilio:\s?(.*)"), re.compile(r"DOMICILIO POSTAL\s+(.*?)\s+Nº LIQUIDACIÓN DE FECHA DE EMISIÓN PROX.")]
-period_regex = [re.compile(r"Periodo:\s?(.*)"), re.compile(r"(\d{2}/\d{2}/\d{2})\s?al\s?(\d{2}/\d{2}/\d{2})")]
-cost_regex = [re.compile(r"\$([0-9]+.[0-9]+)"), re.compile(r"Costo:\s?(\$[0-9]+.[0-9]+)\s?Ref:"), re.compile(r"IMPORTE A PAGAR\s+\$?\s?(.*?)\s+DOMICILIO POSTAL")]
+date_regex = [
+    re.compile(r"Fecha:\s?(\d{2}/\d{2}/\d{2})"),
+    re.compile(r"Vto.:\s?(\d{2}/\d{2}/\d{4})"),
+    re.compile(r"al:\s?(\d{2}/\d{2}/\d{4})"),
+    re.compile(r"Fecha de emisión:\s(\d{2}/\d{2}/\d{4})")
+]
+address_regex = [re.compile(r"Domicilio:\s?(.*)"), re.compile(r"DOMICILIO POSTAL\s+(.*?)\s+Nº LIQUIDACIÓN DE FECHA DE EMISIÓN PROX."), re.compile(r"([A-Z\s\d]+)\nB° CENTRO"), re.compile(r"Domicilio suministro:\n(.+)")]
+period_regex = [re.compile(r"Periodo:\s?(.*)"), re.compile(r"(\d{2}/\d{2}/\d{2})\s?al\s?(\d{2}/\d{2}/\d{2})"), re.compile(r"Período de consumo (\d{4}/\d{2})"), re.compile(r"Período Facturado:\s(\w+ \d{4})")]
+cost_regex = [re.compile(r"\$([0-9]+.[0-9]+)"), re.compile(r"Costo:\s?(\$[0-9]+.[0-9]+)\s?Ref:"), re.compile(r"IMPORTE A PAGAR\s+\$?\s?(.*?)\s+DOMICILIO POSTAL"), re.compile(r"TOTAL A PAGAR \$\s(\d+.\d{2})"), re.compile(r"TOTAL \$\s(\d+.\d{2})"), re.compile(r"\$(\d+.\d{2})"),]
+
 
 async def convert_data_to_json(data):
     """

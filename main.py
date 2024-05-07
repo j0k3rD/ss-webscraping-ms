@@ -18,11 +18,11 @@ async def scrap(data: dict):
     """
     Scrap data from a website.
     """
-    scrap_tasks = scrap_task.delay(data)
-    scrap_tasks.get()
+    # scrap_tasks = scrap_task.delay(data)
+    # scrap_tasks.get()
     extract_tasks = extract_data_task.delay(data)
 
     return {
-        "scrap_task_id": scrap_tasks.id,
+        # "scrap_task_id": scrap_tasks.id,
         "extract_task_id": extract_tasks.id
     }

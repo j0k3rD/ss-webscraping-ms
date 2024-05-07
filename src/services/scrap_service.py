@@ -201,4 +201,4 @@ class ScrapService:
             pages = pdf.pages
             text = "".join(page.extract_text() for page in pages)
             
-        self.global_bills.append({'url': download.suggested_filename, 'content': text})
+        self.global_bills.append({'content': text})

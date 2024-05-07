@@ -4,6 +4,7 @@ import requests
 import httpx
 import json
 
+
 BASE_URL = "http://localhost:5000"
 
 
@@ -62,16 +63,32 @@ async def save_consumed_data(provider_id, consumed_data):
     else:
         return 'Data saved'
 
+
 async def download_pdf(provider_client_id: str):
     data = await get_data_by_provider_id(provider_client_id)
     bills = data.get('bills', [])
 
     c = 1
     temp_dir = tempfile.mkdtemp()
+    contents = []
     for bill in bills:
-        url = bill['url']
+        try:
+            url = bill.get('url')
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+        if url is None:
+            if bill.get('content'):
+                # print("Content found", bill.get('content'))
+                contents.append(bill.get('content'))        
+            continue  # Cambiado de 'break' a 'continue'
+        print('pasa')
         response = requests.get(url)
         with open(os.path.join(temp_dir, f"{c}.pdf"), "wb") as file:
             file.write(response.content)
             c += 1
+
+    if contents:
+        print(len(contents))
+        return contents
     return temp_dir

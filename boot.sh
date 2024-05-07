@@ -6,4 +6,4 @@ then
     playwright install
 fi
 
-uvicorn main:app --reload --port 5001
+uvicorn main:app --reload --port 5003
