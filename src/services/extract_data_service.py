@@ -26,6 +26,7 @@ class ExtractDataService:
                 data = await extract_data_from_pdf(pdf_path)
                 self.all_data.append(json_data)
             all_data_sorted = sorted(self.all_data, key=self.sort_key)
+            print(f"Data: {data}")
             await save_consumed_data(provider_client_id, all_data_sorted)
         except Exception as e:
             print(f"Error al procesar las facturas: {e}")

@@ -1,10 +1,9 @@
 import re
 
-date_regex = re.compile(r"Fecha:\s?(\d{2}/\d{2}/\d{2})"), re.compile(r"Fecha?:\s?(\d{2}/\d{2}/\d{4})")
-address_regex = re.compile(r"Domicilio:\s?(.*)")
-period_regex = re.compile(r"Periodo:\s?(.*)"), re.compile(r"\s?(\d{2}/\d{2}/\d{4})\s?-\s?(\d{2}/\d{2}/\d{4})")
-cost_regex = re.compile(r"\$([0-9]+.[0-9]+)"), re.compile(r"Costo:\s?(\$[0-9]+.[0-9]+)\s?Ref:")
-
+date_regex = [re.compile(r"Vto.:\s?(\d{2}/\d{2}/\d{4})"), re.compile(r"al:\s?(\d{2}/\d{2}/\d{4})")]
+address_regex = [re.compile(r"Domicilio:\s?(.*)"), re.compile(r"DOMICILIO POSTAL\s+(.*?)\s+Nº LIQUIDACIÓN DE FECHA DE EMISIÓN PROX.")]
+period_regex = [re.compile(r"Periodo:\s?(.*)"), re.compile(r"(\d{2}/\d{2}/\d{2})\s?al\s?(\d{2}/\d{2}/\d{2})")]
+cost_regex = [re.compile(r"\$([0-9]+.[0-9]+)"), re.compile(r"Costo:\s?(\$[0-9]+.[0-9]+)\s?Ref:"), re.compile(r"IMPORTE A PAGAR\s+\$?\s?(.*?)\s+DOMICILIO POSTAL")]
 
 async def convert_data_to_json(data):
     """
@@ -15,7 +14,7 @@ async def convert_data_to_json(data):
         data = str(data)
 
     date = next((re.search(regex, data) for regex in date_regex if re.search(regex, data) is not None), None)
-    address = re.search(address_regex, data)
+    address = next((re.search(regex, data) for regex in address_regex if re.search(regex, data) is not None), None)
     period = next((re.search(regex, data) for regex in period_regex if re.search(regex, data) is not None), None)
     cost = next((re.search(regex, data) for regex in cost_regex if re.search(regex, data) is not None), None)
 
