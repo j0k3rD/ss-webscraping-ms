@@ -14,6 +14,7 @@ celery.conf.result_backend = os.environ.get(
 
 @celery.task
 def scrap_task(data: dict):
+    # Primero ejecutamos scrap_task
     invoker = InvokerBrowser()
     browser_data = data['browser']
     browser = browser_data.lower()
@@ -22,12 +23,10 @@ def scrap_task(data: dict):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(data))
+
     print(result)
-    return result
 
-
-@celery.task
-def extract_data_task(data: dict):
+    # Luego ejecutamos extract_data_task con el resultado de scrap_task
     try:
         extract_service = ExtractDataService()
         loop = asyncio.new_event_loop()

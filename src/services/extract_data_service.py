@@ -56,31 +56,3 @@ class ExtractDataService:
         if isinstance(date, list):
             date = tuple(date)
         return (date is None, date)
-    
-    #     """
-    #     provider_client_id = data["provider_client"]["id"]
-    #     try:
-    #         temp_dir = await download_pdf(provider_client_id)
-    #         files = await self.get_files_in_directory(temp_dir)
-    #         for pdf_file in files:
-    #             pdf_path = os.path.join(temp_dir, pdf_file)
-    #             json_data = await convert_data_to_json(data)
-    #             data = await extract_data_from_pdf(pdf_path)
-    #             print(f"Data: {data}")
-    #             self.all_data.append(json_data)
-    #         all_data_sorted = sorted(self.all_data, key=self.sort_key)
-    #         await save_consumed_data(provider_client_id, all_data_sorted)
-    #     except Exception as e:
-    #         print(f"Error al procesar las facturas: {e}")
-
-    # async def get_files_in_directory(self, directory):
-    #     """
-    #     Obtiene la lista de archivos en un directorio dado.
-    #     """
-    #     return os.listdir(directory)
-    
-    # def sort_key(self, item):
-    #     date = item['date']
-    #     if isinstance(date, list):
-    #         date = tuple(date)
-    #     return (date is None, date)

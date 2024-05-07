@@ -93,7 +93,6 @@ class ScrapService:
                     print('Element not found, skipping to next action')
                     continue 
 
-
             if element_type == 'modal':
                 try:
                     await page.click(selector)
@@ -153,7 +152,7 @@ class ScrapService:
                 buttons = await page.query_selector_all(selector)
                 for button in buttons:
                     await button.click()
-                    time.sleep(1)
+
             elif element_type == 'tabla':
                 await page.wait_for_selector(selector)
             else:
@@ -189,6 +188,7 @@ class ScrapService:
         await dialog.accept()
 
     async def handle_download(self, download):
+        time.sleep(2)
         print(f"Descargando: {download.suggested_filename}")
         try:
             path = await download.path()
@@ -200,5 +200,5 @@ class ScrapService:
         with pdfplumber.open(path) as pdf:
             pages = pdf.pages
             text = "".join(page.extract_text() for page in pages)
-            
         self.global_bills.append({'content': text})
+        time.sleep(2)

@@ -1,5 +1,4 @@
 def get_selector(element):
-    print('element', element)
     component_type = element['component_type']
 
     if component_type == 'id':
@@ -8,5 +7,4 @@ def get_selector(element):
         selector = f".{element['content']}"
     else:
         selector = element['content']
-    print('selector', selector)
     return selector

@@ -79,16 +79,13 @@ async def download_pdf(provider_client_id: str):
             continue
         if url is None:
             if bill.get('content'):
-                # print("Content found", bill.get('content'))
                 contents.append(bill.get('content'))        
-            continue  # Cambiado de 'break' a 'continue'
-        print('pasa')
+            continue
         response = requests.get(url)
         with open(os.path.join(temp_dir, f"{c}.pdf"), "wb") as file:
             file.write(response.content)
             c += 1
 
     if contents:
-        print(len(contents))
         return contents
     return temp_dir
