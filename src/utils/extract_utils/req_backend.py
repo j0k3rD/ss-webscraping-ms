@@ -24,6 +24,7 @@ async def get_provider(provider_id):
     provider = await make_request('get', f"{BASE_URL}/provider-clients/{provider_id}")
     if not provider:
         return 'Provider not found'
+    return provider
 
 
 async def get_data_by_provider_id(provider_id):
@@ -42,10 +43,8 @@ async def save_consumed_data(provider_id, consumed_data):
     scrapped_data_id = scrapped_data.get('id')
     bills = scrapped_data.get('bills', [])
 
-    consumption_to_save = []
-    for consumption in consumed_data:
-        if json.dumps(consumption) not in [json.dumps(existing_consumption) for existing_consumption in bills]:
-            consumption_to_save.append(consumption)
+    existing_bills = [json.dumps(bill) for bill in bills]
+    consumption_to_save = [consumption for consumption in consumed_data if json.dumps(consumption) not in existing_bills]
 
     if not consumption_to_save:
         return 'No new data to save'
@@ -68,23 +67,23 @@ async def download_pdf(provider_client_id: str):
     data = await get_data_by_provider_id(provider_client_id)
     bills = data.get('bills', [])
 
-    c = 1
+    file_counter = 1
     temp_dir = tempfile.mkdtemp()
     contents = []
     for bill in bills:
-        try:
-            url = bill.get('url')
-        except Exception as e:
-            print(f"Error: {e}")
-            continue
+        url = bill.get('url')
         if url is None:
             if bill.get('content'):
                 contents.append(bill.get('content'))        
             continue
-        response = requests.get(url)
-        with open(os.path.join(temp_dir, f"{c}.pdf"), "wb") as file:
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            print(f"Error: {e}")
+            continue
+        with open(os.path.join(temp_dir, f"{file_counter}.pdf"), "wb") as file:
             file.write(response.content)
-            c += 1
+            file_counter += 1
 
     if contents:
         return contents

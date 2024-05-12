@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from worker import scrap_task
+from worker import scrap_task, setup_periodic_tasks
+from datetime import datetime
 
 description = """
 SmartServices API helps you do awesome stuff. 🚀
@@ -10,7 +11,6 @@ app = FastAPI(
     description=description,
     version="0.0.1",
 )
-
 
 @app.post("/scrap", tags=["scrap"])
 async def scrap(data: dict):

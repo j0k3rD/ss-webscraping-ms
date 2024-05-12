@@ -20,6 +20,7 @@ class ScrapService:
         self.solver.set_key(os.getenv("KEY_ANTICAPTCHA"))
         self.global_bills = []
         self.save_bills_called = False
+        self.debt = False
 
     async def search(self, data):
         url: str = data['service']['scrapping_config']['url']
@@ -43,7 +44,8 @@ class ScrapService:
                 await page.close()
                 return await self.search(data)
         await page.close()
-        return result
+        # Return debt status
+        return self.debt, result
 
     async def parser(self, data, page: Page, captcha_sequence=None):
         client_number_index = 0
@@ -82,16 +84,18 @@ class ScrapService:
             extra = action.get('extra', None)
             redirect = action.get('redirect', None)
             form = action.get('form', None)
+            debt = action.get('debt', None)
+            no_debt_text = action.get('no_debt_text', None)
 
             try:
-                await page.wait_for_selector(selector)
+                await page.wait_for_selector(selector, timeout=10000)
             except Exception:
                 if i == len(sequence) - 1:
                     print('Last element not found, terminating process')
                     return
                 else:
                     print('Element not found, skipping to next action')
-                    continue 
+                    continue
 
             if element_type == 'modal':
                 try:
@@ -110,15 +114,21 @@ class ScrapService:
                 await page.fill(selector, input_value)
 
             elif element_type in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'table', 'tbody', 'td', 'a', 'ul']:
-                
+                elements = await page.query_selector_all(selector)
+
+                if elements and debt:
+                    debt_message = await elements[0].inner_text()
+                    if no_debt_text and (no_debt_text in debt_message):
+                        self.debt = False
+                    else:
+                        self.debt = True
+
                 if query and redirect:
-                    link = await page.query_selector_all(selector)
-                    href = await link.get_attribute('href')
+                    href = await elements.get_attribute('href')
                     absolute_url = urljoin(page.url, href)
                     await page.goto(absolute_url, wait_until='load')
 
                 elif query and form:
-                    elements = await page.query_selector_all(selector)
                     for i in range(0, 6, 2):
                         td = elements[i]
                         form = await td.query_selector("form")
@@ -126,7 +136,6 @@ class ScrapService:
                         await asyncio.sleep(12)
 
                 elif query:
-                    elements = await page.query_selector_all(selector)
                     if extra == 'map':
                         elements_href = await page.eval_on_selector_all(selector, 'links => links.map(link => link.href)')
                     else:
@@ -140,7 +149,7 @@ class ScrapService:
                     else:
                         elements_formatted = [{'url': urljoin(base_url, href)} for href in elements_href if href is not None]
 
-                    await save_bills(provider_client_id, elements_formatted)
+                    result = await save_bills(provider_client_id, elements_formatted)
                     self.save_bills_called = True
 
                 else:
@@ -153,17 +162,14 @@ class ScrapService:
                 for button in buttons:
                     await button.click()
 
-            elif element_type == 'tabla':
-                await page.wait_for_selector(selector)
-            else:
-                print('element_type not found')
-
         if captcha_sequence and not self.save_bills_called:
-            await save_bills(provider_client_id, self.global_bills)
+            result = await save_bills(provider_client_id, self.global_bills)
         else:
             pass
 
         await page.close()
+
+        return result
 
 
     async def solve_captcha(self, data, page, sitekey_clean, captcha_button_content):

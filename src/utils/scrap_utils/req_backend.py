@@ -33,8 +33,7 @@ async def save_bills(provider_client_id, bills):
                 bills_to_save.append(bill)
 
         if not bills_to_save:
-            print("No new bills to save")
-            return
+            return 'No new bills to save'
         
         # Crear data
         data = {
