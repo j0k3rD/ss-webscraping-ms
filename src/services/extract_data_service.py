@@ -3,6 +3,7 @@ from ..utils.extract_utils.req_backend import download_pdf, save_consumed_data
 from ..utils.extract_utils.convert_data import convert_data_to_json
 from ..utils.extract_utils.extract_data_from_pdf import extract_data_from_pdf
 
+
 class ExtractDataService:
     """
     Servicio para procesar facturas.
@@ -50,9 +51,9 @@ class ExtractDataService:
         Obtiene la lista de archivos en un directorio dado.
         """
         return os.listdir(directory)
-    
+
     def sort_key(self, item):
-        date = item['date']
+        date = item["date"]
         if isinstance(date, list):
             date = tuple(date)
         return (date is None, date)

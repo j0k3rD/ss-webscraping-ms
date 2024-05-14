@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from worker import scrap_task, setup_periodic_tasks
 from datetime import datetime
 
@@ -11,6 +12,20 @@ app = FastAPI(
     description=description,
     version="0.0.1",
 )
+
+origins = [
+    "http://localhost",
+    "http://192.168.18.4",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.post("/scrap", tags=["scrap"])
 async def scrap(data: dict):
