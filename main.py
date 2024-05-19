@@ -8,6 +8,7 @@ SmartServices API helps you do awesome stuff. 🚀
 """
 
 app = FastAPI(
+    openapi_prefix="/api/v1",
     title="SmartService API - WEBSCRAPING MS",
     description=description,
     version="0.0.1",

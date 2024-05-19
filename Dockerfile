@@ -1,16 +1,30 @@
-FROM python:3.11.2-slim-buster
+# synctax = docker/dockerfile:1
 
-# set work directory
-WORKDIR /usr/src/app
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS base
 
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# install dependencies
-RUN pip install --upgrade pip
-COPY ./requirements/dev.txt .
-RUN pip install -r requirements/dev.txt
+WORKDIR /src
 
-# copy project
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid ${UID} \
+    appuser
+
+# Instalando dependencias
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,source=/requirements/dev.txt,target=/src/requirements.txt \
+    python -m pip install -r requirements.txt
+
 COPY . .
+
+EXPOSE 5001
+
+CMD uvicorn main:app --host 0.0.0.0 --port 5001 --reload

@@ -193,8 +193,6 @@ class ScrapService:
 
         if captcha_sequence and not self.save_bills_called:
             result = await save_bills(provider_client_id, self.global_bills)
-        else:
-            pass
 
         await page.close()
 
@@ -212,7 +210,7 @@ class ScrapService:
                 await page.click(captcha_button_content)
             else:
                 print("task finished with error " + self.solver.error_code)
-        except Exception as e:
+        except Exception:
             print("TimeoutError SOLVE CAPTCHA. Reintentando...")
             await page.close()
             return await self.search(data)

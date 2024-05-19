@@ -1,19 +1,25 @@
 services:
-
   celery:
     container_name: celery
-    image: ss-web:v0.0.1
-    command: ["celery", "-A", "app.tasks", "worker", "--loglevel=info", "--logfile=logs/celery.log"]
-    volumes:
-      - ./src:/usr/src/app
+    image: ss-web-ss-web
+    command: [
+        "celery",
+        "-A",
+        "worker",
+        "worker",
+        "--loglevel=info",
+        # "--logfile=logs/celery.log",
+      ]
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     # depends_on:
-      # - web
-      # - redis
+    # - web
+    # - redis
+    networks:
+      - ss-network
 
 networks:
-  red:
+  ss-network:
     external: true
     driver: bridge

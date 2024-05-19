@@ -2,6 +2,7 @@ import os
 from ..utils.extract_utils.req_backend import download_pdf, save_consumed_data
 from ..utils.extract_utils.convert_data import convert_data_to_json
 from ..utils.extract_utils.extract_data_from_pdf import extract_data_from_pdf
+from datetime import datetime
 
 
 class ExtractDataService:
@@ -20,7 +21,7 @@ class ExtractDataService:
         try:
             temp_dir_result = await download_pdf(provider_client_id)
             if isinstance(temp_dir_result, tuple):
-                contents, temp_dir = temp_dir_result
+                _, temp_dir = temp_dir_result
             else:
                 temp_dir = temp_dir_result
 
@@ -56,4 +57,6 @@ class ExtractDataService:
         date = item["date"]
         if isinstance(date, list):
             date = tuple(date)
+        if date is not None:
+            date = datetime.strptime(date, "%d/%m/%y")
         return (date is None, date)

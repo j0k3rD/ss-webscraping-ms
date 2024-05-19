@@ -1,7 +1,6 @@
 services:
-
   redis:
-    # container_name: redis
+    container_name: redis
     image: redis:7.2.4
 
     volumes:
@@ -11,10 +10,9 @@ services:
     command: redis-server /data/redis.conf
 
     networks:
-      - red
-
+      - ss-network
 
 networks:
-  red:
+  ss-network:
     external: true
     driver: bridge
