@@ -100,12 +100,15 @@ class ScrapService:
                     continue
 
             if element_type == "modal":
+                # Esperar a que el modal aparezca
+                await page.wait_for_selector(selector)
                 try:
                     await page.click(selector)
                 except Exception:
                     print("modal not found")
 
             elif element_type == "input":
+                await page.wait_for_selector(selector)
                 try:
                     if action["size"]:
                         size = int(action["size"])
@@ -133,6 +136,9 @@ class ScrapService:
                 "a",
                 "ul",
             ]:
+                # Esperar a que el elemento aparezca
+                await page.wait_for_selector(selector)
+
                 elements = await page.query_selector_all(selector)
 
                 if elements and debt:
@@ -184,6 +190,7 @@ class ScrapService:
                 else:
                     await page.wait_for_selector(selector)
             elif element_type == "button":
+                # Esperar a que el botón aparezca
                 await page.wait_for_selector(selector)
                 await page.click(selector)
             elif element_type == "buttons":

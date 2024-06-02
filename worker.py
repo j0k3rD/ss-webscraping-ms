@@ -48,8 +48,8 @@ def scrap_task(data: dict):
 
         except Exception as e:
             return {"error": f"Error: {e}"}
-        else:
-            return {"status": "success"}
+    else:
+        return {"status": "success"}
 
 
 @celery.task

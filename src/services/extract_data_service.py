@@ -58,5 +58,11 @@ class ExtractDataService:
         if isinstance(date, list):
             date = tuple(date)
         if date is not None:
-            date = datetime.strptime(date, "%d/%m/%y")
+            date_formats = ["%d/%m/%Y", "%d/%m/%y"]
+            for fmt in date_formats:
+                try:
+                    date = datetime.strptime(date, fmt)
+                    break
+                except ValueError:
+                    pass
         return (date is None, date)

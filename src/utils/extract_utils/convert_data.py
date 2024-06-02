@@ -19,12 +19,16 @@ period_regex = [
     re.compile(r"Período Facturado:\s(\w+ \d{4})"),
 ]
 cost_regex = [
-    re.compile(r"\$([0-9]+.[0-9]+)"),
+    # re.compile(r"\$([0-9]+.[0-9]+)"),
     re.compile(r"Costo:\s?(\$[0-9]+.[0-9]+)\s?Ref:"),
     re.compile(r"IMPORTE A PAGAR\s+\$?\s?(.*?)\s+DOMICILIO POSTAL"),
     re.compile(r"TOTAL A PAGAR \$\s(\d+.\d{2})"),
     re.compile(r"TOTAL \$\s(\d+.\d{2})"),
     re.compile(r"\$(\d+.\d{2})"),
+    re.compile(r"Total a pagar hasta el \d{2}/\d{2}/\d{4} \$ (\d+.\d{2})"),
+]
+consumption_regex = [
+    re.compile(r"Consumo Medido (\d+) m³"),
 ]
 
 
@@ -52,6 +56,14 @@ async def convert_data_to_json(data):
         ),
         None,
     )
+    consumption = next(
+        (
+            re.search(regex, data)
+            for regex in consumption_regex
+            if re.search(regex, data) is not None
+        ),
+        None,
+    )
     period = next(
         (
             re.search(regex, data)
@@ -72,6 +84,7 @@ async def convert_data_to_json(data):
     return {
         "date": date.group(1) if date else None,
         "address": address.group(1) if address else None,
+        "consumption": consumption.group(1) if consumption else None,
         "period": period.group(1) if period else None,
         "cost": cost.group(1) if cost else None,
     }
