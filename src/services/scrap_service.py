@@ -89,9 +89,16 @@ class ScrapService:
             debt = action.get("debt", None)
             no_debt_text = action.get("no_debt_text", None)
 
+            consecutive_errors = 0
             try:
                 await page.wait_for_selector(selector, timeout=10000)
+                consecutive_errors = 0
             except Exception:
+                consecutive_errors += 1  # incrementa el contador de errores si el elemento no se encuentra
+                if consecutive_errors == 2:
+                    print("Two consecutive elements not found, restarting...")
+                    await page.close()
+                    return await self.search(data)
                 if i == len(sequence) - 1:
                     print("Last element not found, terminating process")
                     return

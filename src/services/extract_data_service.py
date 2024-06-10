@@ -39,7 +39,7 @@ class ExtractDataService:
             if isinstance(temp_dir, list):
                 for content in temp_dir:
                     json_data = await convert_data_to_json(content)
-                    # print(f"Content: {content}")
+                    print(f"Content: {content}")
                     self.all_data.append(json_data)
                 all_data_sorted = sorted(self.all_data, key=self.sort_key)
                 await save_consumed_data(provider_client_id, all_data_sorted)
