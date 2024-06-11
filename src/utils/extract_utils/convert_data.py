@@ -22,6 +22,7 @@ period_regex = [
     re.compile(r"Período Facturado:\s(\w+ \d{4})"),
 ]
 cost_regex = [
+    re.compile(r"Tipo Lectura: Real\n\$ \s?([0-9]+.[0-9]+,[0-9]+)"),
     re.compile(r"IMPORTE A PAGAR\n\$\s?([0-9]+.[0-9]+)"),
     re.compile(r"TOTAL PESOS: \$ ([0-9]+.[0-9]+)"),
     re.compile(r"TOTAL \$ ([0-9]+,[0-9]+)"),
@@ -31,8 +32,7 @@ cost_regex = [
     re.compile(r"TOTAL A PAGAR \$\s(\d+.\d{2})"),
     re.compile(r"TOTAL \$\s(\d+.\d{2})"),
     re.compile(r"Total a pagar hasta el \d{2}/\d{2}/\d{4} \$ (\d+.\d{2})"),
-    re.compile(r"Tipo Lectura: Real\n\$ ([0-9]+.[0-9]+,[0-9]+)"),
-    # re.compile(r"\$([0-9]+.[0-9]+)"),
+    re.compile(r"\$([0-9]+.[0-9]+)"),
     re.compile(r"\$(\d+.\d{2})"),
 ]
 consumption_regex = [
@@ -97,10 +97,12 @@ async def convert_data_to_json(data):
         "consumption": consumption.group(1) if consumption else None,
         "period": period.group(1) if period else None,
         "cost": (
-            "{:.2f}".format(
-                float(cost.group(1).replace(".", "").replace(",", ".")) / 100
+            "{:.2f}".format(float(cost.group(1).replace(".", "").replace(",", ".")))
+            if cost and re.search(r"\.\d{3}", cost.group(1))
+            else (
+                ("{:.2f}".format(float(cost.group(1).replace(",", ""))))
+                if cost
+                else None
             )
-            if cost
-            else None
         ),
     }
