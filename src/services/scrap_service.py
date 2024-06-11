@@ -75,7 +75,7 @@ class ScrapService:
                     continue
 
         if captcha and not self.save_bills_called:
-            await save_bills(provider_client_id, self.global_bills)
+            await save_bills(provider_client_id, self.global_bills, self.debt)
 
         return True
 

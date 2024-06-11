@@ -18,13 +18,14 @@ async def make_request(method, url, data=None):
         return response.json()
 
 
-async def save_bills(provider_client_id, bills):
+async def save_bills(provider_client_id, bills, debt=False):
     # Buscar provider_client_id
     provider_client = await make_request(
         "get", f"{BASE_URL}/provider-client/{provider_client_id}"
     )
     if not provider_client:
         return
+
     # Buscar scrapped_data_id con provider_client_id
     scrapped_data_id = await make_request(
         "get", f"{BASE_URL}/scrapped-datas/provider-client/{provider_client_id}"
@@ -48,6 +49,7 @@ async def save_bills(provider_client_id, bills):
             "provider_client_id": provider_client_id,
             "bills": bills_to_save,
             "consumption_data": consumption_data,
+            "debt": debt,
         }
         response = await make_request(
             "put", f"{BASE_URL}/scrapped-datas/{scrapped_data_id['id']}", data
@@ -58,7 +60,11 @@ async def save_bills(provider_client_id, bills):
             print("Bills saved successfully")
     else:
         # Crear scrapped_data
-        data = {"provider_client_id": provider_client_id, "bills": bills}
+        data = {
+            "provider_client_id": provider_client_id,
+            "bills": bills,
+            "debt": debt,
+        }
         response = await make_request("post", f"{BASE_URL}/scrapped-data", data)
         if response:
             return "Scrapped_data created successfully"
