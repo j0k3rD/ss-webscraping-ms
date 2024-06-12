@@ -89,30 +89,26 @@ def scrap_all_providers_by_service_task(service):
         return {"status": "success"}
 
 
-# TODO: FIXEAR SCHEDULE
 @celery.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     services = loop.run_until_complete(get_services())
+    print("Services: ", services)
     for service in services:
         crondict = ast.literal_eval(service["crontab"])
-        next_minute = datetime.now().minute + 1
         minute = list(crondict["minute"])[0]
         hour = list(crondict["hour"])[0]
         day_of_week = ",".join(map(str, crondict["day_of_week"]))
-        print("Minute: ", minute)
-        print("Hour: ", hour)
-        print("Day of week: ", day_of_week)
+        day_of_month = ",".join(map(str, crondict["day_of_month"]))
+        month_of_year = ",".join(map(str, crondict["month_of_year"]))
         sender.add_periodic_task(
             crontab(
-                minute=next_minute,
-                hour="*",
-                # hour=f'{hour}',
-                day_of_week="*",
-                # day_of_week=f'{day_of_week}',
-                day_of_month="*",
-                month_of_year="*",
+                minute=f"{minute}",
+                hour=f"{hour}",
+                day_of_week=f"{day_of_week}",
+                day_of_month=f"{day_of_month}",
+                month_of_year=f"{month_of_year}",
             ),
             scrap_all_providers_by_service_task.s(service),
             name=f"Scraping {service['company_name']} every minute",

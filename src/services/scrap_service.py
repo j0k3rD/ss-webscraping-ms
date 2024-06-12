@@ -24,8 +24,8 @@ class ScrapService:
         self.debt = False
 
     async def search(self, data):
-        url = data["service"]["scrapping_config"]["url"]
-        captcha = data["service"]["scrapping_config"]["captcha"]
+        url = data["service"]["scraping_config"]["url"]
+        captcha = data["service"]["scraping_config"]["captcha"]
         page = await self.browser.navigate_to_page(url)
 
         try:
@@ -39,7 +39,7 @@ class ScrapService:
         return self.debt, result
 
     async def parser(self, data, page: Page, captcha):
-        sequence = data["service"]["scrapping_config"]["sequence"]
+        sequence = data["service"]["scraping_config"]["sequence"]
         client_number = data["provider_client"]["client_code"]
         client_number_index = 0
         provider_client_id = data["provider_client"]["id"]
@@ -47,7 +47,7 @@ class ScrapService:
         if captcha:
             page.on("dialog", self.handle_dialog)
             page.on("download", self.handle_download)
-            captcha_sequence = data["service"]["scrapping_config"]["captcha_sequence"]
+            captcha_sequence = data["service"]["scraping_config"]["captcha_sequence"]
             try:
                 await self.handle_captcha(data, page, captcha_sequence, client_number)
             except TimeoutError:
