@@ -106,3 +106,8 @@ async def convert_data_to_json(data):
             )
         ),
     }
+
+    if all(value is None for value in result.values()):
+        return None
+
+    return result

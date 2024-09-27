@@ -1,6 +1,6 @@
 services:
-  ss-web:
-    container_name: ss-web
+  ss-webscraper:
+    container_name: ss-webscraper
     build:
       context: ../../
     volumes:
@@ -12,6 +12,31 @@ services:
       - .env
     networks:
       - ss-network
+    depends_on:
+      - redis
+
+  redis:
+    container_name: redis
+    image: redis:7.2.4
+    volumes:
+      - ./_data:/data
+      - ./_data/redis.conf:/data/redis.conf
+    command: redis-server /data/redis.conf
+    networks:
+      - ss-network
+
+  celery:
+    container_name: celery
+    build:
+      context: ../../
+    command: ["celery", "-A", "worker", "worker", "--loglevel=info"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    networks:
+      - ss-network
+    depends_on:
+      - redis
 
 networks:
   ss-network:

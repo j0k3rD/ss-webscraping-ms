@@ -178,6 +178,7 @@ class ScrapService:
 
     async def handle_modal(self, page, selector):
         await page.wait_for_selector(selector)
+        print("Modal found", selector)
         try:
             await page.click(selector)
         except Exception:

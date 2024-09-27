@@ -17,9 +17,9 @@ load_dotenv()
 celery = Celery(__name__)
 celery.conf.enable_utc = True
 celery.conf.timezone = "UTC"
-celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
+celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379")
 celery.conf.result_backend = os.environ.get(
-    "CELERY_RESULT_BACKEND", "redis://localhost:6379"
+    "CELERY_RESULT_BACKEND", "redis://redis:6379"
 )
 
 

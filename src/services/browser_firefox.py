@@ -9,7 +9,12 @@ class FirefoxBrowser(Browser):
 
     async def _get_browser(self):
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.firefox.launch()
+        self.browser = await self.playwright.firefox.launch(
+            headless=False,
+            # proxy={
+            # "server": "rpc.proxyrotator.com:6969",
+            # }
+        )
         return self.browser
 
     async def navigate_to_page(self, url: str):

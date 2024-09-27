@@ -8,15 +8,15 @@ SmartServices API helps you do awesome stuff. 🚀
 """
 
 app = FastAPI(
-    openapi_prefix="/api/v1",
+    root_path="/api/v1",
     title="SmartService API - WEBSCRAPING MS",
     description=description,
     version="0.0.1",
 )
 
 origins = [
-    "http://localhost",
-    "http://192.168.18.4",
+    "http://0.0.0.0:5001",
+    # "http://192.168.18.4",
 ]
 
 app.add_middleware(

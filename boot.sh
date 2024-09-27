@@ -1,9 +1,8 @@
 #!/bin/bash
-source .venv/bin/activate
 
-if ! command playwright -V &> /dev/null
-then
-    playwright install
+if ! command -v playwright &> /dev/null; then
+    echo "Installing Playwright..."
+    playwright install --with-deps
 fi
 
-uvicorn main:app --reload --host localhost --port 5001
+uvicorn main:app --reload --host 0.0.0.0 --port 5000
