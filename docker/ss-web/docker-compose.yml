@@ -7,7 +7,7 @@ services:
       - ./src:/app/src
     ports:
       - ${SS_WEB_PORT}:${SS_WEB_PORT}
-    restart: always
+    # restart: always
     env_file:
       - .env
     networks:
@@ -33,6 +33,18 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    networks:
+      - ss-network
+    depends_on:
+      - redis
+
+  celery-beat:
+    container_name: celery-beat
+    build:
+      context: ../../
+    command: ["celery", "-A", "worker", "beat", "--loglevel=info"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
     networks:
       - ss-network
     depends_on:
