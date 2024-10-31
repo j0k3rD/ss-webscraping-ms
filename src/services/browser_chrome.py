@@ -13,14 +13,20 @@ class ChromeBrowser(Browser):
 
     async def _get_browser(self) -> PlaywrightBrowser:
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=False)
+        endpoint_url = "wss://brd-customer-hl_9ec2f068-zone-ss_scrap:tsvv3ezauqdp@brd.superproxy.io:9222"
+
+        self.browser = await self.playwright.chromium.connect_over_cdp(
+            endpoint_url=endpoint_url
+        )
         return self.browser
 
     async def navigate_to_page(self, url: str):
         browser = await self._get_browser()
-        page = await browser.new_page()
+        browser_context = await browser.new_context(accept_downloads=True)
+        page = await browser_context.new_page()
+        client = await page.context.new_cdp_session(page)
         await page.goto(url)
-        return page
+        return page, client
 
     async def close_browser(self):
         if self.browser:

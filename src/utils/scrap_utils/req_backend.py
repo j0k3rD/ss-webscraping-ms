@@ -20,6 +20,8 @@ async def make_request(method, url, data=None):
 
 async def save_bills(provider_client_id, bills, debt=False):
     # Buscar provider_client_id
+    print(f"provider_client_id: {provider_client_id}")
+    print(f"bills: {bills}")
     provider_client = await make_request(
         "get", f"{BASE_URL}/provider-client/{provider_client_id}"
     )

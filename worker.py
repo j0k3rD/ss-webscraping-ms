@@ -8,7 +8,6 @@ from src.services.scrap_service import ScrapService
 from src.services.extract_data_service import ExtractDataService
 from src.utils.worker_utils.req_backend import get_services, get_providers_by_service
 from src.utils.worker_utils.req_backend import get_providers_by_service
-from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -26,11 +25,7 @@ celery.conf.result_backend = os.environ.get(
 @celery.task(name="scrap_task")
 def scrap_task(data: dict):
     # Primero ejecutamos scrap_task
-    invoker = InvokerBrowser()
-    browser_data = data["browser"]
-    browser = browser_data.lower()
-    browser_web = invoker.get_command(browser)
-    scrap_service = ScrapService(browser_web)
+    scrap_service = ScrapService()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(scrap_service.search(data))
@@ -93,23 +88,27 @@ def scrap_all_providers_by_service_task(service):
 def setup_periodic_tasks(sender, **kwargs):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    services = loop.run_until_complete(get_services())
-    print("Services: ", services)
-    for service in services:
-        crondict = ast.literal_eval(service["crontab"])
-        minute = list(crondict["minute"])[0]
-        hour = list(crondict["hour"])[0]
-        day_of_week = ",".join(map(str, crondict["day_of_week"]))
-        day_of_month = ",".join(map(str, crondict["day_of_month"]))
-        month_of_year = ",".join(map(str, crondict["month_of_year"]))
-        sender.add_periodic_task(
-            crontab(
-                minute=f"{minute}",
-                hour=f"{hour}",
-                day_of_week=f"{day_of_week}",
-                day_of_month=f"{day_of_month}",
-                month_of_year=f"{month_of_year}",
-            ),
-            scrap_all_providers_by_service_task.s(service),
-            name=f"Scraping {service['company_name']} every minute",
-        )
+    try:
+        services = loop.run_until_complete(get_services())
+        print("Services: ", services)
+        for service in services:
+            crondict = ast.literal_eval(service["crontab"])
+            minute = list(crondict["minute"])[0]
+            hour = list(crondict["hour"])[0]
+            day_of_week = ",".join(map(str, crondict["day_of_week"]))
+            day_of_month = ",".join(map(str, crondict["day_of_month"]))
+            month_of_year = ",".join(map(str, crondict["month_of_year"]))
+            sender.add_periodic_task(
+                crontab(
+                    minute=f"{minute}",
+                    hour=f"{hour}",
+                    day_of_week=f"{day_of_week}",
+                    day_of_month=f"{day_of_month}",
+                    month_of_year=f"{month_of_year}",
+                ),
+                scrap_task.s(service["id"]),
+            )
+    except Exception as e:
+        print(f"Error setting up periodic tasks: {e}")
+    finally:
+        loop.close()

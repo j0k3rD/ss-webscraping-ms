@@ -16,6 +16,8 @@ app = FastAPI(
 
 origins = [
     "http://0.0.0.0:5001",
+    "http://localhost:5001",
+    "http://ss-admin:5001",
     # "http://192.168.18.4",
 ]
 

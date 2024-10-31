@@ -30,6 +30,7 @@ class ExtractDataService:
                 for pdf_file in files:
                     pdf_path = os.path.join(temp_dir, pdf_file)
                     extracted_data = await extract_data_from_pdf(pdf_path)
+                    print(f"Extracted data: {extracted_data}")
                     json_data = await convert_data_to_json(extracted_data)
                     self.all_data.append(json_data)
 
@@ -56,7 +57,11 @@ class ExtractDataService:
         """
         Filtra los registros que contienen solo valores null.
         """
-        return [record for record in data_list if any(value is not None for value in record.values())]
+        return [
+            record
+            for record in data_list
+            if any(value is not None for value in record.values())
+        ]
 
     def sort_key(self, item):
         date = item.get("date")
