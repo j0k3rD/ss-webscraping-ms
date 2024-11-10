@@ -2,7 +2,7 @@ services:
   ss-webscraper:
     container_name: ss-webscraper
     build:
-      context: ../../
+      context: .
     volumes:
       - ./src:/app/src
     ports:
@@ -28,7 +28,7 @@ services:
   celery:
     container_name: celery
     build:
-      context: ../../
+      context: .
     command: ["celery", "-A", "worker", "worker", "--loglevel=info"]
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -41,7 +41,7 @@ services:
   celery-beat:
     container_name: celery-beat
     build:
-      context: ../../
+      context: .
     command: ["celery", "-A", "worker", "beat", "--loglevel=info"]
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
