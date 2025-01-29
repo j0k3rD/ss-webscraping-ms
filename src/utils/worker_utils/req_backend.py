@@ -1,9 +1,6 @@
-import json, httpx, os
-from dotenv import load_dotenv
+import httpx
+from src.core.config import Config
 
-load_dotenv()
-
-BASE_URL = os.getenv("BACKEND_URL")
 HTTP_OK = 200
 HTTP_CREATED = 201
 
@@ -22,23 +19,23 @@ async def make_request(method, url, data=None):
         return response.json()
 
 
-async def get_providers_by_service(service_id):
+async def get_user_service_by_service(service_id):
     """
-    Get providers by service ID.
+    Get all user_service by service ID.
     """
-    providers = await make_request(
-        "get", f"{BASE_URL}/provider-clients/service/{service_id}"
+    users_service = await make_request(
+        "get", f"{Config.BACKEND_URL}/user-service/service/{service_id}"
     )
-    if not providers:
-        raise Exception("No providers found")
-    return providers
+    if not users_service:
+        raise Exception("No user_service found")
+    return users_service
 
 
 async def get_services():
     """
     Get all services.
     """
-    services = await make_request("get", f"{BASE_URL}/services")
+    services = await make_request("get", f"{Config.BACKEND_URL}/service")
     if not services:
         raise Exception("No services found")
     return services

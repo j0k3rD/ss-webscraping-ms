@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from worker import scrap_task, setup_periodic_tasks
-from datetime import datetime
+from src.workers.tasks import scrap_task
 
 description = """
 SmartServices API helps you do awesome stuff. 🚀
@@ -15,10 +14,9 @@ app = FastAPI(
 )
 
 origins = [
-    "http://0.0.0.0:5001",
-    "http://localhost:5001",
-    "http://ss-admin:5001",
-    # "http://192.168.18.4",
+    "http://0.0.0.0:5000",
+    "http://localhost:5000",
+    "http://ss-admin:5000",
 ]
 
 app.add_middleware(

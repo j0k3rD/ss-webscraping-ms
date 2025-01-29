@@ -7,48 +7,63 @@ services:
       - ./src:/app/src
     ports:
       - ${SS_WEB_PORT}:${SS_WEB_PORT}
-    # restart: always
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://ss-webscraper-redis:6379
     networks:
       - ss-network
     depends_on:
-      - redis
+      - ss-webscraper-redis
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
-  redis:
-    container_name: redis
-    image: redis:7.2.4
+  ss-webscraper-redis:
+    container_name: ss-webscraper-redis
+    image: redis:7.4.0
+    ports:
+      - '6381:6379'
+    networks:
+      - ss-network
     volumes:
-      - ./_data:/data
-      - ./_data/redis.conf:/data/redis.conf
-    command: redis-server /data/redis.conf
-    networks:
-      - ss-network
+      - ss_webscraper_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  celery:
-    container_name: celery
-    build:
-      context: .
-    command: ["celery", "-A", "worker", "worker", "--loglevel=info"]
+  ss-webscraper-celery:
+    container_name: ss-webscraper-celery
+    build: .
+    command: celery -A src.workers.tasks worker --loglevel=INFO --concurrency=4
+    volumes:
+      - .:/app
+    depends_on:
+      - ss-webscraper-redis
+    env_file:
+      - .env
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://ss-webscraper-redis:6379
     networks:
       - ss-network
-    depends_on:
-      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '2'
+          memory: 1G
 
-  celery-beat:
-    container_name: celery-beat
-    build:
-      context: .
-    command: ["celery", "-A", "worker", "beat", "--loglevel=info"]
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-    networks:
-      - ss-network
-    depends_on:
-      - redis
+volumes:
+  ss_webscraper_redis_data:
 
 networks:
   ss-network:

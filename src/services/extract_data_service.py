@@ -2,7 +2,6 @@ import os
 from ..utils.extract_utils.req_backend import download_pdf, save_consumed_data
 from ..utils.extract_utils.convert_data import convert_data_to_json
 from ..utils.extract_utils.extract_data_from_pdf import extract_data_from_pdf
-from datetime import datetime
 
 
 class ExtractDataService:
@@ -17,9 +16,12 @@ class ExtractDataService:
         """
         Descarga, procesa y guarda facturas para un número de cliente dado.
         """
-        provider_client_id = data["provider_client"]["id"]
+        user_service_id = data["user_service"]["id"]
         try:
-            temp_dir_result = await download_pdf(provider_client_id)
+            temp_dir_result = await download_pdf(user_service_id)
+            if not isinstance(temp_dir_result, (str, tuple, list)):
+                raise ValueError(f"Failed to download PDF: {temp_dir_result}")
+
             if isinstance(temp_dir_result, tuple):
                 _, temp_dir = temp_dir_result
             else:
@@ -36,43 +38,27 @@ class ExtractDataService:
 
             elif isinstance(temp_dir, list):
                 for content in temp_dir:
-                    json_data = await convert_data_to_json(content)
-                    self.all_data.append(json_data)
+                    if isinstance(content, dict) and "url" in content:
+                        # Aquí podrías agregar lógica para manejar las URLs si es necesario
+                        json_data = await convert_data_to_json(content)
+                        self.all_data.append(json_data)
+                    else:
+                        print(f"Unexpected content type or missing 'url': {content}")
 
-            self.all_data = await self.filter_null_records(self.all_data)
+            if isinstance(self.all_data, list):
+                self.all_data = {i: data for i, data in enumerate(self.all_data)}
 
-            all_data_sorted = sorted(self.all_data, key=self.sort_key)
-            await save_consumed_data(provider_client_id, all_data_sorted)
+            await save_consumed_data(user_service_id, self.all_data)
 
         except Exception as e:
             print(f"Error al procesar las facturas: {e}")
 
     async def get_files_in_directory(self, directory):
         """
-        Obtiene la lista de archivos en un directorio dado.
-        """
-        return os.listdir(directory)
-
-    async def filter_null_records(self, data_list):
-        """
-        Filtra los registros que contienen solo valores null.
+        Obtiene una lista de archivos en un directorio dado.
         """
         return [
-            record
-            for record in data_list
-            if any(value is not None for value in record.values())
+            f
+            for f in os.listdir(directory)
+            if os.path.isfile(os.path.join(directory, f))
         ]
-
-    def sort_key(self, item):
-        date = item.get("date")
-        if isinstance(date, list):
-            date = tuple(date)
-        if date is not None:
-            date_formats = ["%d/%m/%Y", "%d/%m/%y"]
-            for fmt in date_formats:
-                try:
-                    date = datetime.strptime(date, fmt)
-                    break
-                except ValueError:
-                    pass
-        return (date is None, date)

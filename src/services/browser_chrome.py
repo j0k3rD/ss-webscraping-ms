@@ -1,5 +1,6 @@
 from playwright.async_api import async_playwright, Browser as PlaywrightBrowser
 from src.services.browser import Browser
+from src.core.config import Config
 
 
 class ChromeBrowser(Browser):
@@ -13,7 +14,7 @@ class ChromeBrowser(Browser):
 
     async def _get_browser(self) -> PlaywrightBrowser:
         self.playwright = await async_playwright().start()
-        endpoint_url = "wss://brd-customer-hl_9ec2f068-zone-ss_scrap:tsvv3ezauqdp@brd.superproxy.io:9222"
+        endpoint_url = Config.ENDPOINT_PROXY
 
         self.browser = await self.playwright.chromium.connect_over_cdp(
             endpoint_url=endpoint_url

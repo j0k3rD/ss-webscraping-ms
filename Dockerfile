@@ -63,10 +63,10 @@ RUN python -m playwright install
 COPY . .
 
 # Copiar el script de espera
-COPY wait-for-redis.sh /usr/local/bin/wait-for-redis.sh
-RUN chmod +x /usr/local/bin/wait-for-redis.sh
+# COPY wait-for-redis.sh /usr/local/bin/wait-for-redis.sh
+# RUN chmod +x /usr/local/bin/wait-for-redis.sh
 
 EXPOSE 5000
 
 # Usar el script de espera antes de iniciar la aplicación
-CMD ["wait-for-redis.sh", "redis", "./boot.sh"]
+CMD ["./boot.sh"]

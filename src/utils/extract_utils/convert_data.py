@@ -1,5 +1,6 @@
 import re
 
+# Regex patterns for extracting dates
 date_regex = [
     re.compile(r"Vto.:\s(\d{2}/\d{2}/\d{4})"),
     re.compile(r"PERIODO\s(\d{2}/\d{2}/\d{2})"),
@@ -8,6 +9,8 @@ date_regex = [
     re.compile(r"al:\s?(\d{2}/\d{2}/\d{4})"),
     re.compile(r"Fecha de emisión:\s(\d{2}/\d{2}/\d{4})"),
 ]
+
+# Regex patterns for extracting addresses
 address_regex = [
     re.compile(r"DOMICILIO POSTAL\n(.+?)\n"),
     re.compile(r"Domicilio:\s?(.*)"),
@@ -15,12 +18,16 @@ address_regex = [
     re.compile(r"([A-Z\s\d]+)\nB° CENTRO"),
     re.compile(r"Domicilio suministro:\n(.+)"),
 ]
+
+# Regex patterns for extracting periods
 period_regex = [
     re.compile(r"Periodo:\s?(.*)"),
     re.compile(r"(\d{2}/\d{2}/\d{2})\s?al\s?(\d{2}/\d{2}/\d{2})"),
     re.compile(r"Período de consumo (\d{4}/\d{2})"),
     re.compile(r"Período Facturado:\s(\w+ \d{4})"),
 ]
+
+# Regex patterns for extracting costs
 cost_regex = [
     re.compile(r"Tipo Lectura: Real\n\$ \s?([0-9]+.[0-9]+,[0-9]+)"),
     re.compile(r"IMPORTE A PAGAR\n\$\s?([0-9]+.[0-9]+)"),
@@ -35,11 +42,37 @@ cost_regex = [
     re.compile(r"\$([0-9]+.[0-9]+)"),
     re.compile(r"\$(\d+.\d{2})"),
 ]
+
+# Regex patterns for extracting consumption
 consumption_regex = [
     re.compile(r"Cargo Variable kWh (\d+)"),
-    re.compile(r"Consumo Medido (\d+) m³"),
-    re.compile(r"Cargo Variable kWh (\d+)"),
 ]
+
+# Dictionary to group all regex patterns
+regex_patterns = {
+    "date": date_regex,
+    "address": address_regex,
+    "period": period_regex,
+    "cost": cost_regex,
+    "consumption": consumption_regex,
+}
+
+
+def extract_data(text, pattern_type):
+    """
+    Extracts data from text using the specified pattern type.
+
+    :param text: The text to search.
+    :param pattern_type: The type of pattern to use (e.g., 'date', 'address').
+    :return: A list of matched data.
+    """
+    patterns = regex_patterns.get(pattern_type, [])
+    matches = []
+    for pattern in patterns:
+        match = pattern.search(text)
+        if match:
+            matches.append(match.group(1))
+    return matches
 
 
 async def convert_data_to_json(data):

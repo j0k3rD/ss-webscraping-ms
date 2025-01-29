@@ -1,9 +1,0 @@
-SS_WEB_PORT=5000
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/db_name
-
-BACKEND_URL = http://localhost:5001
-
-SECRET_KEY =
-ALGORITHM = 
-ACCESS_TOKEN_EXPIRE_MINUTES =
-REFRESH_TOKEN_EXPIRE_MINUTES =
