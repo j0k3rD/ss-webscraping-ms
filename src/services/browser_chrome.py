@@ -14,20 +14,24 @@ class ChromeBrowser(Browser):
 
     async def _get_browser(self) -> PlaywrightBrowser:
         self.playwright = await async_playwright().start()
-        endpoint_url = Config.ENDPOINT_PROXY
+        # endpoint_url = Config.ENDPOINT_PROXY
 
-        self.browser = await self.playwright.chromium.connect_over_cdp(
-            endpoint_url=endpoint_url
-        )
+        self.browser = await self.playwright.firefox.launch()
+        # self.browser = await self.playwright.chromium.connect_over_cdp(
+        # endpoint_url=endpoint_url
+        # )
         return self.browser
 
     async def navigate_to_page(self, url: str):
         browser = await self._get_browser()
-        browser_context = await browser.new_context(accept_downloads=True)
-        page = await browser_context.new_page()
-        client = await page.context.new_cdp_session(page)
+        # browser_context = await browser.new_context(accept_downloads=True)
+        # page = await browser_context.new_page()
+        page = await browser.new_page()
+        # client = await page.context.new_cdp_session(page)
+
         await page.goto(url)
-        return page, client
+        # return page, client
+        return page
 
     async def close_browser(self):
         if self.browser:

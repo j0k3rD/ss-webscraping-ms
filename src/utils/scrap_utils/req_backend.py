@@ -1,8 +1,15 @@
-import json, httpx
+import json
+import httpx
 from src.core.config import Config
+from typing import Dict, Any, Optional, List
 
 
-async def make_request(method, url, data=None):
+async def make_request(
+    method: str, url: str, data: Optional[Dict] = None
+) -> Optional[Any]:
+    """
+    Realiza una solicitud HTTP asíncrona.
+    """
     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
         try:
             if method in ["post", "patch"]:
@@ -28,51 +35,109 @@ async def make_request(method, url, data=None):
             return None
 
 
-async def save_bills(user_service_id, bills, debt=False):
-    print(f"user_service_id: {user_service_id}")
+async def save_bills(
+    user_service_id: int, bills: List[Dict], debt: bool = False
+) -> Dict[str, Any]:
+    """
+    Guarda las facturas en el backend y devuelve un resultado estructurado.
+    """
+    print(f"BIlls: {bills}")
 
+    # Verificar si el user_service existe
     user_service = await make_request(
         "get", f"{Config.BACKEND_URL}/user-service/{user_service_id}"
     )
     if not user_service:
-        return False
+        return {
+            "success": False,
+            "message": "User service not found",
+            "new_bills_saved": False,
+        }
 
+    # Obtener scrapped_data existente
     scrapped_data = await make_request(
         "get", f"{Config.BACKEND_URL}/scrapped-data/user-service/{user_service_id}"
     )
+    # Si no existe scrapped_data, crear un nuevo registro
+    if not scrapped_data:
+        new_scrapped_data = {
+            "user_service_id": user_service_id,
+            "bills_url": bills,  # Guardar todas las facturas nuevas
+            "consumption_data": {},
+        }
+        response = await make_request(
+            "post", f"{Config.BACKEND_URL}/scrapped-data", new_scrapped_data
+        )
+        if not response:
+            return {
+                "success": False,
+                "message": "Failed to create scrapped data",
+                "new_bills_saved": False,
+            }
+        return {
+            "success": True,
+            "message": "New scrapped data created with bills",
+            "new_bills_saved": True,
+        }
 
-    bills_to_save = []
-    if scrapped_data:
-        # Process existing data
-        existing_bills = scrapped_data.get("bills_url", [])
+    # Ensure scrapped_data is a list
+    if not isinstance(scrapped_data, list):
+        scrapped_data = [scrapped_data]
+
+    for data in scrapped_data:
+        # Ensure bills_url is a list within the dictionary
+        if not isinstance(data.get("bills_url"), list):
+            data["bills_url"] = []
+
+        # Ensure bills is a list
+        if isinstance(bills, dict):
+            bills = [bills]
+        elif not isinstance(bills, list):
+            print(f"Invalid data type for bills: {type(bills)}")
+            return {
+                "success": False,
+                "message": "Invalid data type for bills, expected a list or dict",
+                "new_bills_saved": False,
+            }
+
+        print(f"bills: {bills}")
+        print(f"scrapped_data_id: {data['id']}")
+
+        bills_to_save = []
+        existing_bills = data.get("bills_url", [])
         for bill in bills:
             if json.dumps(bill) not in [
                 json.dumps(existing_bill) for existing_bill in existing_bills
             ]:
                 bills_to_save.append(bill)
-    else:
-        # No existing data, save all bills
-        bills_to_save = bills
-        scrapped_data = {
-            "user_service_id": user_service_id,
-            "bills_url": [],
-            "consumption_data": {},
-        }
-        # print(f"bills_to_save: {bills_to_save}")
-    if bills_to_save:
-        scrapped_data["bills_url"].extend(bills_to_save)
-        api_endpoint = f"{Config.BACKEND_URL}/scrapped-data/"
 
-        result = await make_request(
-            "post" if not scrapped_data.get("id") else "patch",
-            api_endpoint,
-            data=scrapped_data,
-        )
-
-        if not result:
-            print(f"Failed to save bills for user_service_id: {user_service_id}")
-            return False
-
-        return True
-
-    return True
+        if bills_to_save:
+            data["bills_url"].extend(bills_to_save)
+            print(f"DATA: {data}")
+            # Organizar la información para la solicitud PATCH
+            data = {
+                "bills_url": {"bills": data["bills_url"]},
+                "consumption_data": data["consumption_data"],
+            }
+            response = await make_request(
+                "patch",
+                f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
+                data,
+            )
+            if not response:
+                return {
+                    "success": False,
+                    "message": "Failed to update scrapped data",
+                    "new_bills_saved": False,
+                }
+            return {
+                "success": True,
+                "message": "New bills saved successfully",
+                "new_bills_saved": True,
+            }
+        else:
+            return {
+                "success": True,
+                "message": "No new bills to save",
+                "new_bills_saved": False,
+            }

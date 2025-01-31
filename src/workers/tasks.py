@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, Dict
 from celery import Celery
 from celery.schedules import crontab
 import ast
@@ -14,28 +15,26 @@ c_app.config_from_object("src.core.config")
 
 
 @c_app.task(name="scrap_task")
-def scrap_task(data: dict):
-    # Primero ejecutamos scrap_task
+def scrap_task(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Tarea principal que ejecuta el scraping y, si es necesario, la extracción de datos.
+    """
     scrap_service = ScrapService()
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(scrap_service.search(data))
+    # asyncio.set_event_loop(loop)
+    # result = loop.run_until_complete(scrap_service.search(data))
 
-    print("Result: ", result)
+    # print("Search result: ", result)
 
-    if result[1] != "No new bills to save":
-        # Luego ejecutamos extract_data_task con el resultado de scrap_task
-        try:
-            extract_service = ExtractDataService()
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(extract_service.plumb_bills(data))
-            return {"status": "success"}
-
-        except Exception as e:
-            return {"error": f"Error: {e}"}
+    # if result["should_extract"]:
+    try:
+        extract_service = ExtractDataService()
+        loop.run_until_complete(extract_service.plumb_bills(data))
+        return {"status": "success", "message": "Data extracted successfully"}
+    except Exception as e:
+        return {"status": "error", "message": f"Error during extraction: {e}"}
     else:
-        return {"status": "success"}
+        return {"status": "success", "message": result["save_result"]["message"]}
 
 
 @c_app.task

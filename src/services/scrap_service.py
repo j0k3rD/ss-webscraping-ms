@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse, urljoin
 import pdfplumber
 from playwright.async_api import Page
@@ -16,8 +17,13 @@ class ScrapService:
         self.solver.set_verbose(1)
         self.solver.set_key(Config.KEY_ANTICAPTCHA)
         self.debt = False
+        self.global_bills = []
+        self.save_bills_called = False
 
-    async def search(self, data):
+    async def search(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Realiza el scraping y guarda las facturas.
+        """
         url = data["service"]["scraping_config"]["url"]
         captcha = data["service"]["scraping_config"]["captcha"]
         captcha_sequence = data["service"]["scraping_config"].get(
@@ -30,17 +36,42 @@ class ScrapService:
         browser_web = invoker.get_command(browser)
         self.browser = browser_web
 
-        page = await browser_web.navigate_to_page(url)
+        page_result = await browser_web.navigate_to_page(url)
+        if isinstance(page_result, tuple):
+            page, _ = page_result
+        else:
+            page = page_result
+
         try:
+            user_service_id = data["user_service"].get("id")
+            if not user_service_id:
+                print("Error: 'id' key is missing in 'user_service'")
+                return {
+                    "success": False,
+                    "message": "'id' key is missing in 'user_service'",
+                    "new_bills_saved": False,
+                }
+
             result = await self.parser(data, page, captcha)
+            save_result = await save_bills(user_service_id, result, self.debt)
+            return {
+                "debt": self.debt,
+                "save_result": save_result,
+                "should_extract": save_result["new_bills_saved"],
+            }
         except Exception as e:
-            print(f"Error: {e}")
-            await page.close()
-            return await self.search(data)
+            print(f"Error during search: {e}")
+            return {
+                "debt": self.debt,
+                "save_result": {
+                    "success": False,
+                    "message": str(e),
+                    "new_bills_saved": False,
+                },
+                "should_extract": True,
+            }
         finally:
             await page.close()
-
-        return self.debt, result
 
     async def parser(self, data, page: Page, captcha, client=None):
         sequence = data["service"]["scraping_config"]["sequence"]
@@ -58,18 +89,17 @@ class ScrapService:
             await self.wait_for_captcha_solve(client)
 
         consecutive_errors = 0
-        client_number_index = 0
-        global_bills = []
+        customer_number_index = 0
 
         for action in sequence:
             try:
-                client_number_index = await self.execute_action(
+                customer_number_index = await self.execute_action(
                     page,
                     action,
                     customer_number,
                     user_service_id,
-                    client_number_index,
-                    global_bills,
+                    customer_number_index,
+                    self.global_bills,
                 )
                 consecutive_errors = 0
             except Exception as e:
@@ -84,26 +114,25 @@ class ScrapService:
                     continue
 
         if captcha and not self.save_bills_called:
-            await save_bills(user_service_id, global_bills, self.debt)
+            await save_bills(user_service_id, self.global_bills, self.debt)
 
         return True
 
-    async def handle_captcha(self, data, page, captcha_sequence, client_number):
-        for step in captcha_sequence:
-            try:
-                if step.get("element_type") == "input":
-                    await page.wait_for_selector(get_selector(step), timeout=3000)
-                    await page.fill(get_selector(step), str(client_number))
-                elif step.get("element_type") == "captcha":
-                    sitekey_element = await page.query_selector(step["content"])
-                    sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
-                    await self.solve_captcha(
-                        data, page, sitekey_clean, step["captcha_button_content"]
-                    )
-            except Exception as e:
-                print(f"Error handling captcha step: {e}")
-                await page.close()
-                return await self.search(data)
+    async def handle_captcha(self, data, page, captcha_sequence, customer_number):
+        try:
+            await page.wait_for_selector(
+                get_selector(captcha_sequence[0]), timeout=3000
+            )
+            await page.fill(get_selector(captcha_sequence[0]), str(customer_number))
+            sitekey_element = await page.query_selector(captcha_sequence[1]["content"])
+            sitekey_clean = await sitekey_element.get_attribute("data-sitekey")
+            await self.solve_captcha(
+                data, page, sitekey_clean, captcha_sequence[2]["captcha_button_content"]
+            )
+        except Exception as e:
+            print(f"Error handling captcha step: {e}")
+            await page.close()
+            return await self.search(data)
 
     async def wait_for_captcha_solve(self, client):
         try:
@@ -169,18 +198,18 @@ class ScrapService:
         return customer_number_index
 
     async def handle_input_or_button(
-        self, page, action, selector, client_number, client_number_index
+        self, page, action, selector, customer_number, customer_number_index
     ):
         if action["element_type"] == "input":
-            size = int(action.get("size", len(client_number)))
-            input_value = client_number[
-                client_number_index : client_number_index + size
+            size = int(action.get("size", len(customer_number)))
+            input_value = customer_number[
+                customer_number_index : customer_number_index + size
             ]
             await page.fill(selector, input_value)
-            client_number_index += size
+            customer_number_index += size
         elif action["element_type"] == "button":
             await page.click(selector)
-        return client_number_index
+        return customer_number_index
 
     async def handle_element(
         self, page, action, debt, no_debt_text, user_service_id, global_bills
@@ -234,17 +263,20 @@ class ScrapService:
 
     async def solve_captcha(self, data, page, sitekey_clean, captcha_button_content):
         try:
+            print("Solving captcha...")
             self.solver.set_website_url(page.url)
             self.solver.set_website_key(sitekey_clean)
             g_response = self.solver.solve_and_return_solution()
             if g_response != 0:
+                print(f"Captcha solved: {g_response}")
                 await page.evaluate(
                     f"document.getElementById('g-recaptcha-response').innerHTML = '{g_response}'"
                 )
                 await page.click(captcha_button_content)
             else:
                 print("Task finished with error " + self.solver.error_code)
-        except Exception:
+        except Exception as e:
+            print(f"Error solving captcha: {e}")
             print("TimeoutError SOLVE CAPTCHA. Reattempting...")
             await page.close()
             return await self.search(data)

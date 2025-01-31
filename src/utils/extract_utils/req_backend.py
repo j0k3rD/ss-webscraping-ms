@@ -50,8 +50,19 @@ async def get_data_by_user_service_id(user_service_id):
         return None
 
     # Si scrapped_data es una lista, devolvemos el primer elemento
-    if isinstance(scrapped_data, list) and len(scrapped_data) > 0:
-        return scrapped_data[0]
+    if isinstance(scrapped_data, list):
+        if len(scrapped_data) > 0:
+            print(f"Found {len(scrapped_data)} records. Using the first one.")
+            scrapped_data = scrapped_data[0]
+        else:
+            print("Scrapped Data list is empty.")
+            return None
+
+    # Si no es un diccionario, lanzamos un error
+    if not isinstance(scrapped_data, dict):
+        print(f"Unexpected data type for scrapped_data: {type(scrapped_data)}")
+        return None
+
     return scrapped_data
 
 
@@ -64,8 +75,21 @@ async def save_consumed_data(user_service_id, consumed_data):
         return "Failed to save data"
 
     scrapped_data_id = scrapped_data.get("id")
-    bills = scrapped_data.get("bills_url", {}).get("bills", [])
+    if not scrapped_data_id:
+        print("Scrapped Data ID not found")
+        return "Failed to save data"
 
+    # Handle bills_url as a list
+    bills_url = scrapped_data.get("bills_url", [])
+    if isinstance(bills_url, list):
+        bills = bills_url  # Use the list directly
+    elif isinstance(bills_url, dict):
+        bills = bills_url.get("bills", [])  # Fallback to dictionary handling
+    else:
+        print(f"Unexpected data type for bills_url: {type(bills_url)}")
+        return "Failed to save data"
+
+    # Convert existing bills to JSON strings for comparison
     existing_bills = [json.dumps(bill) for bill in bills]
     consumption_to_save = [
         consumption
@@ -76,13 +100,12 @@ async def save_consumed_data(user_service_id, consumed_data):
     if not consumption_to_save:
         return "No new data to save"
 
+    # Prepare data for the PATCH request
     data = {
-        "id": scrapped_data_id,
-        "user_service_id": user_service_id,
         "consumption_data": consumed_data,
-        "bills_url": {"bills": bills},
     }
-
+    print(f"Data to save: {data}")
+    # Send the PATCH request to update the backend
     response = await make_request(
         "patch", f"{Config.BACKEND_URL}/scrapped-data/{scrapped_data_id}", data
     )
@@ -97,30 +120,37 @@ async def download_pdf(user_service_id: str):
 
     if not isinstance(data, dict):
         print(f"Unexpected data type for scrapped_data: {type(data)}")
-        return "Failed to download PDF"
+        print(f"Data: {data}")
+        return None
 
-    bills = data.get("bills_url", {}).get("bills", [])
-    print(f"billsTODOWNLOAD: {bills}")
+    bills_url = data.get("bills_url", [])
+
+    # Ensure bills_url is a list
+    if not isinstance(bills_url, list):
+        print(f"Unexpected data type for bills_url: {type(bills_url)}")
+        return None
 
     temp_dir = tempfile.mkdtemp()
     contents = []
-    for i, bill in enumerate(bills, start=1):
+    for i, bill in enumerate(bills_url, start=1):
+        if not isinstance(bill, dict):
+            print(f"Unexpected data type for bill: {type(bill)}")
+            continue
+        content = bill.get("content")
+        if content:
+            contents.append(content)
+            continue
         url = bill.get("url")
-        if url is None:
-            if bill.get("content"):
-                contents.append(bill.get("content"))
-            continue
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                file_path = os.path.join(temp_dir, f"{i}.pdf")
-                with open(file_path, "wb") as file:
-                    file.write(response.content)
-        except Exception as e:
-            print(f"Error downloading PDF from {url}: {e}")
-            continue
+        if url:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    file_path = os.path.join(temp_dir, f"{i}.pdf")
+                    with open(file_path, "wb") as f:
+                        f.write(response.content)
+                    contents.append(file_path)
+            except httpx.HTTPStatusError as e:
+                print(f"Failed to download PDF from {url}: {e}")
 
-    if contents:
-        return contents
-    return temp_dir
+    return contents
