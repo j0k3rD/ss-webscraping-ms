@@ -21,18 +21,18 @@ def scrap_task(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     scrap_service = ScrapService()
     loop = asyncio.new_event_loop()
-    # asyncio.set_event_loop(loop)
-    # result = loop.run_until_complete(scrap_service.search(data))
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(scrap_service.search(data))
 
-    # print("Search result: ", result)
+    print("Search result: ", result)
 
-    # if result["should_extract"]:
-    try:
-        extract_service = ExtractDataService()
-        loop.run_until_complete(extract_service.plumb_bills(data))
-        return {"status": "success", "message": "Data extracted successfully"}
-    except Exception as e:
-        return {"status": "error", "message": f"Error during extraction: {e}"}
+    if result["should_extract"]:
+        try:
+            extract_service = ExtractDataService()
+            loop.run_until_complete(extract_service.plumb_bills(data))
+            return {"status": "success", "message": "Data extracted successfully"}
+        except Exception as e:
+            return {"status": "error", "message": f"Error during extraction: {e}"}
     else:
         return {"status": "success", "message": result["save_result"]["message"]}
 

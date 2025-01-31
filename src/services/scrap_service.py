@@ -43,16 +43,8 @@ class ScrapService:
             page = page_result
 
         try:
-            user_service_id = data["user_service"].get("id")
-            if not user_service_id:
-                print("Error: 'id' key is missing in 'user_service'")
-                return {
-                    "success": False,
-                    "message": "'id' key is missing in 'user_service'",
-                    "new_bills_saved": False,
-                }
-
             result = await self.parser(data, page, captcha)
+            user_service_id = data["user_service"].get("id")
             save_result = await save_bills(user_service_id, result, self.debt)
             return {
                 "debt": self.debt,

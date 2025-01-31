@@ -41,7 +41,7 @@ async def save_bills(
     """
     Guarda las facturas en el backend y devuelve un resultado estructurado.
     """
-    print(f"BIlls: {bills}")
+    print(f"user_service_id: {user_service_id}")
 
     # Verificar si el user_service existe
     user_service = await make_request(
@@ -58,6 +58,7 @@ async def save_bills(
     scrapped_data = await make_request(
         "get", f"{Config.BACKEND_URL}/scrapped-data/user-service/{user_service_id}"
     )
+    print(f"scrapped_data: {scrapped_data}")
     # Si no existe scrapped_data, crear un nuevo registro
     if not scrapped_data:
         new_scrapped_data = {
@@ -80,64 +81,78 @@ async def save_bills(
             "new_bills_saved": True,
         }
 
-    # Ensure scrapped_data is a list
-    if not isinstance(scrapped_data, list):
-        scrapped_data = [scrapped_data]
+    # Ensure scrapped_data is a dictionary
+    if isinstance(scrapped_data, list):
+        for data in scrapped_data:
+            # Ensure bills_url is a list within the dictionary
+            if not isinstance(data.get("bills_url"), list):
+                data["bills_url"] = []
 
-    for data in scrapped_data:
-        # Ensure bills_url is a list within the dictionary
-        if not isinstance(data.get("bills_url"), list):
-            data["bills_url"] = []
+            bills_to_save = []
+            existing_bills = data.get("bills_url", [])
+            for bill in bills:
+                if json.dumps(bill) not in [
+                    json.dumps(existing_bill) for existing_bill in existing_bills
+                ]:
+                    bills_to_save.append(bill)
 
-        # Ensure bills is a list
-        if isinstance(bills, dict):
-            bills = [bills]
-        elif not isinstance(bills, list):
-            print(f"Invalid data type for bills: {type(bills)}")
+            if bills_to_save:
+                data["bills_url"].extend(bills_to_save)
+                # enviar nada mas que bills_url
+                data = {"bills_url": data["bills_url"]}
+                response = await make_request(
+                    "patch",
+                    f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
+                    data,
+                )
+                if not response:
+                    return {
+                        "success": False,
+                        "message": "Failed to update scrapped data",
+                        "new_bills_saved": False,
+                    }
+        return {
+            "success": True,
+            "message": "New scrapped data created with bills",
+            "new_bills_saved": True,
+        }
+
+    # Ensure bills_url is a list within the dictionary
+    if not isinstance(scrapped_data.get("bills_url"), list):
+        scrapped_data["bills_url"] = []
+
+    print(f"bills: {bills}")
+    print(f"scrapped_data_id: {scrapped_data['id']}")
+
+    bills_to_save = []
+    existing_bills = scrapped_data.get("bills_url", [])
+    for bill in bills:
+        if json.dumps(bill) not in [
+            json.dumps(existing_bill) for existing_bill in existing_bills
+        ]:
+            bills_to_save.append(bill)
+
+    if bills_to_save:
+        scrapped_data["bills_url"].extend(bills_to_save)
+        response = await make_request(
+            "patch",
+            f"{Config.BACKEND_URL}/scrapped-data/{scrapped_data['id']}",
+            scrapped_data,
+        )
+        if not response:
             return {
                 "success": False,
-                "message": "Invalid data type for bills, expected a list or dict",
+                "message": "Failed to update scrapped data",
                 "new_bills_saved": False,
             }
-
-        print(f"bills: {bills}")
-        print(f"scrapped_data_id: {data['id']}")
-
-        bills_to_save = []
-        existing_bills = data.get("bills_url", [])
-        for bill in bills:
-            if json.dumps(bill) not in [
-                json.dumps(existing_bill) for existing_bill in existing_bills
-            ]:
-                bills_to_save.append(bill)
-
-        if bills_to_save:
-            data["bills_url"].extend(bills_to_save)
-            print(f"DATA: {data}")
-            # Organizar la información para la solicitud PATCH
-            data = {
-                "bills_url": {"bills": data["bills_url"]},
-                "consumption_data": data["consumption_data"],
-            }
-            response = await make_request(
-                "patch",
-                f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
-                data,
-            )
-            if not response:
-                return {
-                    "success": False,
-                    "message": "Failed to update scrapped data",
-                    "new_bills_saved": False,
-                }
-            return {
-                "success": True,
-                "message": "New bills saved successfully",
-                "new_bills_saved": True,
-            }
-        else:
-            return {
-                "success": True,
-                "message": "No new bills to save",
-                "new_bills_saved": False,
-            }
+        return {
+            "success": True,
+            "message": "New bills saved successfully",
+            "new_bills_saved": True,
+        }
+    else:
+        return {
+            "success": True,
+            "message": "No new bills to save",
+            "new_bills_saved": False,
+        }
