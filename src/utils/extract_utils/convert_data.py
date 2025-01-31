@@ -76,11 +76,10 @@ def extract_data(text, pattern_type):
 
 
 async def convert_data_to_json(data):
+    print("CONVERT DATA TO JSON")
     """
     Convierte los datos de una factura en formato JSON.
     """
-    print(f"Data: {data}")
-    print("PASA")
     # Asegúrate de que data es una cadena de texto
     if not isinstance(data, str):
         data = str(data)
@@ -125,8 +124,6 @@ async def convert_data_to_json(data):
         ),
         None,
     )
-
-    print("PASA")
 
     return {
         "date": date.group(1) if date else None,

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import json
@@ -49,27 +50,16 @@ async def get_data_by_user_service_id(user_service_id):
         print("No Scrapped Data found")
         return None
 
-    # Si scrapped_data es una lista, devolvemos el primer elemento
     if isinstance(scrapped_data, list):
-        if len(scrapped_data) > 0:
-            print(f"Found {len(scrapped_data)} records. Using the first one.")
-            scrapped_data = scrapped_data[0]
-        else:
-            print("Scrapped Data list is empty.")
-            return None
-
-    # Si no es un diccionario, lanzamos un error
-    if not isinstance(scrapped_data, dict):
-        print(f"Unexpected data type for scrapped_data: {type(scrapped_data)}")
-        return None
-
+        return scrapped_data[0]
     return scrapped_data
 
 
 async def save_consumed_data(user_service_id, consumed_data):
+    print("SAVE CONSUMED DATA")
     """Guarda los datos de consumo en el backend."""
     scrapped_data = await get_data_by_user_service_id(user_service_id)
-
+    print(f"Consumed data: {consumed_data}")
     if not isinstance(scrapped_data, dict):
         print(f"Unexpected data type for scrapped_data: {type(scrapped_data)}")
         return "Failed to save data"
@@ -81,6 +71,7 @@ async def save_consumed_data(user_service_id, consumed_data):
 
     # Handle bills_url as a list
     bills_url = scrapped_data.get("bills_url", [])
+    # print(f"bills_url: {bills_url}")
     if isinstance(bills_url, list):
         bills = bills_url  # Use the list directly
     elif isinstance(bills_url, dict):
@@ -101,6 +92,7 @@ async def save_consumed_data(user_service_id, consumed_data):
         return "No new data to save"
 
     # Prepare data for the PATCH request
+    print(f"Consumption to save: {consumption_to_save}")
     data = {
         "consumption_data": consumed_data,
     }
@@ -114,43 +106,39 @@ async def save_consumed_data(user_service_id, consumed_data):
     return "Data saved"
 
 
-async def download_pdf(user_service_id: str):
+async def download_pdf(url_bills):
     """Descarga los PDFs asociados a un servicio de usuario."""
-    data = await get_data_by_user_service_id(user_service_id)
-
-    if not isinstance(data, dict):
-        print(f"Unexpected data type for scrapped_data: {type(data)}")
-        print(f"Data: {data}")
-        return None
-
-    bills_url = data.get("bills_url", [])
-
-    # Ensure bills_url is a list
-    if not isinstance(bills_url, list):
-        print(f"Unexpected data type for bills_url: {type(bills_url)}")
+    if not isinstance(url_bills, list):
+        print(f"Unexpected data type for url_bills: {type(url_bills)}")
         return None
 
     temp_dir = tempfile.mkdtemp()
     contents = []
-    for i, bill in enumerate(bills_url, start=1):
-        if not isinstance(bill, dict):
-            print(f"Unexpected data type for bill: {type(bill)}")
-            continue
-        content = bill.get("content")
-        if content:
-            contents.append(content)
-            continue
-        url = bill.get("url")
-        if url:
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    file_path = os.path.join(temp_dir, f"{i}.pdf")
-                    with open(file_path, "wb") as f:
-                        f.write(response.content)
-                    contents.append(file_path)
-            except httpx.HTTPStatusError as e:
-                print(f"Failed to download PDF from {url}: {e}")
 
+    # Download all PDFs in parallel
+    async with httpx.AsyncClient() as client:
+        tasks = [
+            download_single_pdf(client, bill["url"], temp_dir, i)
+            for i, bill in enumerate(url_bills, start=1)
+        ]
+        downloaded_files = await asyncio.gather(*tasks)
+
+    # Add downloaded files to contents
+    contents.extend([file for file in downloaded_files if file is not None])
+
+    print(f"Downloaded files: {contents}")
     return contents
+
+
+async def download_single_pdf(client, url, temp_dir, index):
+    """Descarga un solo PDF y lo guarda en el directorio temporal."""
+    try:
+        response = await client.get(url)
+        response.raise_for_status()
+        file_path = os.path.join(temp_dir, f"{index}.pdf")
+        with open(file_path, "wb") as f:
+            f.write(response.content)
+        return file_path
+    except httpx.HTTPStatusError as e:
+        print(f"Failed to download PDF from {url}: {e}")
+        return None
