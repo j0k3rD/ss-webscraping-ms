@@ -57,8 +57,8 @@ async def save_bills(
         "get", f"{Config.BACKEND_URL}/scrapped-data/user-service/{user_service_id}"
     )
 
-    # Si no existe scrapped_data, crear un nuevo registro y terminar
-    if not scrapped_data:
+    # Si no existe scrapped_data o es un valor no válido, crear un nuevo registro
+    if not scrapped_data or not isinstance(scrapped_data, (list, dict)):
         new_scrapped_data = {
             "user_service_id": user_service_id,
             "bills_url": bills,  # Guardar todas las facturas nuevas
@@ -80,13 +80,9 @@ async def save_bills(
             "new_bills_saved": True,  # Set to True after creation
         }
 
-    # Si scrapped_data existe, asegurarse de que es una lista
-    if not isinstance(scrapped_data, list):
-        return {
-            "success": False,
-            "message": "Invalid scrapped_data format: expected a list",
-            "new_bills_saved": False,
-        }
+    # Si scrapped_data es un diccionario, convertirlo en una lista
+    if isinstance(scrapped_data, dict):
+        scrapped_data = [scrapped_data]
 
     # Procesar cada item en scrapped_data
     new_bills_saved = False

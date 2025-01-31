@@ -59,7 +59,7 @@ class ScrapService:
                     "message": str(e),
                     "new_bills_saved": False,
                 },
-                "should_extract": False,
+                "should_extract": True,
             }
         finally:
             await page.close()
@@ -107,7 +107,7 @@ class ScrapService:
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
 
-        return True
+        return self.global_bills
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
         try:

@@ -16,82 +16,83 @@ class ExtractDataService:
     def __init__(self):
         self.all_data = []
 
+    async def plumb_bills(self, data):
+        """
+        Descarga, procesa y guarda facturas para un número de cliente dado.
+        """
+        user_service_id = data["user_service"]["id"]
+        try:
+            # Step 1: Fetch scrapped_data once
+            scrapped_data = await get_data_by_user_service_id(user_service_id)
+            if not scrapped_data or not isinstance(scrapped_data, dict):
+                raise ValueError(f"Invalid scrapped_data: {scrapped_data}")
 
-async def plumb_bills(self, data):
-    """
-    Descarga, procesa y guarda facturas para un número de cliente dado.
-    """
-    user_service_id = data["user_service"]["id"]
-    try:
-        # Step 1: Fetch scrapped_data once
-        scrapped_data = await get_data_by_user_service_id(user_service_id)
-        if not scrapped_data or not isinstance(scrapped_data, dict):
-            raise ValueError(f"Invalid scrapped_data: {scrapped_data}")
+            bills_url = scrapped_data.get("bills_url", [])
+            if not isinstance(bills_url, list):
+                raise ValueError(
+                    f"Unexpected data type for bills_url: {type(bills_url)}"
+                )
 
-        bills_url = scrapped_data.get("bills_url", [])
-        if not isinstance(bills_url, list):
-            raise ValueError(f"Unexpected data type for bills_url: {type(bills_url)}")
+            # Step 2: Separate bills with URLs and bills with content
+            url_bills = [
+                bill
+                for bill in bills_url
+                if isinstance(bill, dict) and "url" in bill and bill["url"] is not None
+            ]
+            content_bills = [
+                bill
+                for bill in bills_url
+                if isinstance(bill, dict)
+                and "content" in bill
+                and bill["content"] is not None
+            ]
 
-        # Step 2: Separate bills with URLs and bills with content
-        url_bills = [
-            bill
-            for bill in bills_url
-            if isinstance(bill, dict) and "url" in bill and bill["url"] is not None
-        ]
-        content_bills = [
-            bill
-            for bill in bills_url
-            if isinstance(bill, dict)
-            and "content" in bill
-            and bill["content"] is not None
-        ]
+            # Step 3: Download all PDFs in parallel (only for bills with URLs)
+            if url_bills:
+                temp_dir_result = await download_pdf(url_bills)  # Pass only URL bills
+                if not isinstance(temp_dir_result, (str, tuple, list)):
+                    raise ValueError(f"Failed to download PDF: {temp_dir_result}")
 
-        # Step 3: Download all PDFs in parallel (only for bills with URLs)
-        if url_bills:
-            temp_dir_result = await download_pdf(url_bills)  # Pass only URL bills
-            if not isinstance(temp_dir_result, (str, tuple, list)):
-                raise ValueError(f"Failed to download PDF: {temp_dir_result}")
+                if isinstance(temp_dir_result, tuple):
+                    _, temp_dir = temp_dir_result
+                elif isinstance(temp_dir_result, list):
+                    files = temp_dir_result  # Assuming the list contains file paths
+                else:
+                    temp_dir = temp_dir_result
 
-            if isinstance(temp_dir_result, tuple):
-                _, temp_dir = temp_dir_result
-            elif isinstance(temp_dir_result, list):
-                files = temp_dir_result  # Assuming the list contains file paths
-            else:
-                temp_dir = temp_dir_result
+                if isinstance(temp_dir_result, list):
+                    for pdf_file in files:
+                        extracted_data = await extract_data_from_pdf(pdf_file)
+                        json_data = await convert_data_to_json(extracted_data)
+                        self.all_data.append(json_data)
+                else:
+                    if not isinstance(temp_dir, str):
+                        raise ValueError(
+                            f"Expected temp_dir to be a string, got {type(temp_dir)}"
+                        )
 
-            if isinstance(temp_dir_result, list):
-                for pdf_file in files:
-                    extracted_data = await extract_data_from_pdf(pdf_file)
-                    json_data = await convert_data_to_json(extracted_data)
-                    self.all_data.append(json_data)
-            else:
-                if not isinstance(temp_dir, str):
-                    raise ValueError(
-                        f"Expected temp_dir to be a string, got {type(temp_dir)}"
-                    )
+                    files = await self.get_files_in_directory(temp_dir)
+                    for pdf_file in files:
+                        pdf_path = os.path.join(temp_dir, pdf_file)
+                        extracted_data = await extract_data_from_pdf(pdf_path)
+                        json_data = await convert_data_to_json(extracted_data)
+                        self.all_data.append(json_data)
 
-                files = await self.get_files_in_directory(temp_dir)
-                for pdf_file in files:
-                    pdf_path = os.path.join(temp_dir, pdf_file)
-                    extracted_data = await extract_data_from_pdf(pdf_path)
-                    json_data = await convert_data_to_json(extracted_data)
-                    self.all_data.append(json_data)
+            # Step 4: Process bills with content
+            for bill in content_bills:
+                print("Content found, skipping download and proceeding to extraction.")
+                json_data = await convert_data_to_json(bill)
+                self.all_data.append(json_data)
 
-        # Step 4: Process bills with content
-        for bill in content_bills:
-            print("Content found, skipping download and proceeding to extraction.")
-            json_data = await convert_data_to_json(bill)
-            self.all_data.append(json_data)
+            # Convert all_data to a dictionary if it's a list
+            if isinstance(self.all_data, list):
+                self.all_data = {i: data for i, data in enumerate(self.all_data)}
 
-        # Convert all_data to a dictionary if it's a list
-        if isinstance(self.all_data, list):
-            self.all_data = {i: data for i, data in enumerate(self.all_data)}
+            # Step 5: Save the processed data
+            await save_consumed_data(user_service_id, self.all_data)
 
-        # Step 5: Save the processed data
-        await save_consumed_data(user_service_id, self.all_data)
-
-    except Exception as e:
-        print(f"Error al procesar las facturas: {e}")
+        except Exception as e:
+            print(f"Error al procesar las facturas: {e}")
 
     async def get_files_in_directory(self, directory):
         if not isinstance(directory, str):
