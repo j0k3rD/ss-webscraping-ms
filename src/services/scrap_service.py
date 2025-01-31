@@ -29,7 +29,6 @@ class ScrapService:
         captcha_sequence = data["service"]["scraping_config"].get(
             "captcha_sequence", []
         )
-        print("captcha_sequence", captcha_sequence)
 
         invoker = InvokerBrowser()
         browser = "firefox" if captcha and captcha_sequence else "chrome"
@@ -60,7 +59,7 @@ class ScrapService:
                     "message": str(e),
                     "new_bills_saved": False,
                 },
-                "should_extract": True,
+                "should_extract": False,
             }
         finally:
             await page.close()
@@ -108,7 +107,7 @@ class ScrapService:
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
 
-        return True
+        return self.global_bills  # Return the list of bills instead of True
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
         try:
@@ -134,7 +133,6 @@ class ScrapService:
                     "detectTimeout": 10 * 1000,
                 },
             )
-            print(result)
         except Exception as e:
             print(f"Error: {e}")
             raise
@@ -242,7 +240,6 @@ class ScrapService:
 
     async def handle_modal(self, page, selector):
         await page.wait_for_selector(selector)
-        print("Modal found", selector)
         try:
             await page.click(selector)
         except Exception:
@@ -269,18 +266,16 @@ class ScrapService:
                 print("Task finished with error " + self.solver.error_code)
         except Exception as e:
             print(f"Error solving captcha: {e}")
-            print("TimeoutError SOLVE CAPTCHA. Reattempting...")
+            ("TimeoutError SOLVE CAPTCHA. Reattempting...")
             await page.close()
             return await self.search(data)
 
     async def handle_dialog(self, dialog):
         await asyncio.sleep(2)
-        print(f"Dialog message: {dialog.message}")
         await dialog.accept()
 
     async def handle_download(self, download):
         await asyncio.sleep(2)
-        print(f"Descargando: {download.suggested_filename}")
         try:
             path = await download.path()
         except TargetClosedError:
@@ -288,8 +283,6 @@ class ScrapService:
                 "La página, el contexto o el navegador se han cerrado antes de que se pudiera acceder a la ruta del archivo descargado."
             )
             return
-        print(f"Guardado en: {path}")
-
         with pdfplumber.open(path) as pdf:
             pages = pdf.pages
             text = "".join(page.extract_text() for page in pages)

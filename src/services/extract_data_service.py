@@ -40,7 +40,6 @@ class ExtractDataService:
 
             # Step 3: Download all PDFs in parallel
             if url_bills:
-                print("URLs found, downloading PDFs and extracting data.")
                 temp_dir_result = await download_pdf(url_bills)  # Pass only URL bills
                 if not isinstance(temp_dir_result, (str, tuple, list)):
                     raise ValueError(f"Failed to download PDF: {temp_dir_result}")

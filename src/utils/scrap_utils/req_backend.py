@@ -41,8 +41,6 @@ async def save_bills(
     """
     Guarda las facturas en el backend y devuelve un resultado estructurado.
     """
-    print(f"user_service_id: {user_service_id}")
-
     # Verificar si el user_service existe
     user_service = await make_request(
         "get", f"{Config.BACKEND_URL}/user-service/{user_service_id}"
@@ -58,13 +56,14 @@ async def save_bills(
     scrapped_data = await make_request(
         "get", f"{Config.BACKEND_URL}/scrapped-data/user-service/{user_service_id}"
     )
-    print(f"scrapped_data: {scrapped_data}")
+
     # Si no existe scrapped_data, crear un nuevo registro
     if not scrapped_data:
         new_scrapped_data = {
             "user_service_id": user_service_id,
             "bills_url": bills,  # Guardar todas las facturas nuevas
             "consumption_data": {},
+            "debt": debt,
         }
         response = await make_request(
             "post", f"{Config.BACKEND_URL}/scrapped-data", new_scrapped_data
@@ -83,7 +82,11 @@ async def save_bills(
 
     # Ensure scrapped_data is a dictionary
     if isinstance(scrapped_data, list):
+        # If scrapped_data is a list, process each item
         for data in scrapped_data:
+            if not isinstance(data, dict):
+                continue  # Skip invalid entries
+
             # Ensure bills_url is a list within the dictionary
             if not isinstance(data.get("bills_url"), list):
                 data["bills_url"] = []
@@ -98,12 +101,12 @@ async def save_bills(
 
             if bills_to_save:
                 data["bills_url"].extend(bills_to_save)
-                # enviar nada mas que bills_url
-                data = {"bills_url": data["bills_url"]}
+                # Send only bills_url for update
+                update_data = {"bills_url": data["bills_url"]}
                 response = await make_request(
                     "patch",
                     f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
-                    data,
+                    update_data,
                 )
                 if not response:
                     return {
@@ -117,12 +120,17 @@ async def save_bills(
             "new_bills_saved": True,
         }
 
+    # Ensure scrapped_data is a dictionary
+    if not isinstance(scrapped_data, dict):
+        return {
+            "success": False,
+            "message": "Invalid scrapped_data format",
+            "new_bills_saved": False,
+        }
+
     # Ensure bills_url is a list within the dictionary
     if not isinstance(scrapped_data.get("bills_url"), list):
         scrapped_data["bills_url"] = []
-
-    print(f"bills: {bills}")
-    print(f"scrapped_data_id: {scrapped_data['id']}")
 
     bills_to_save = []
     existing_bills = scrapped_data.get("bills_url", [])

@@ -76,7 +76,6 @@ def extract_data(text, pattern_type):
 
 
 async def convert_data_to_json(data):
-    print("CONVERT DATA TO JSON")
     """
     Convierte los datos de una factura en formato JSON.
     """

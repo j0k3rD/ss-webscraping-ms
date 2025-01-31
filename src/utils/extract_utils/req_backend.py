@@ -56,10 +56,8 @@ async def get_data_by_user_service_id(user_service_id):
 
 
 async def save_consumed_data(user_service_id, consumed_data):
-    print("SAVE CONSUMED DATA")
     """Guarda los datos de consumo en el backend."""
     scrapped_data = await get_data_by_user_service_id(user_service_id)
-    print(f"Consumed data: {consumed_data}")
     if not isinstance(scrapped_data, dict):
         print(f"Unexpected data type for scrapped_data: {type(scrapped_data)}")
         return "Failed to save data"
@@ -71,7 +69,6 @@ async def save_consumed_data(user_service_id, consumed_data):
 
     # Handle bills_url as a list
     bills_url = scrapped_data.get("bills_url", [])
-    # print(f"bills_url: {bills_url}")
     if isinstance(bills_url, list):
         bills = bills_url  # Use the list directly
     elif isinstance(bills_url, dict):
@@ -92,11 +89,9 @@ async def save_consumed_data(user_service_id, consumed_data):
         return "No new data to save"
 
     # Prepare data for the PATCH request
-    print(f"Consumption to save: {consumption_to_save}")
     data = {
         "consumption_data": consumed_data,
     }
-    print(f"Data to save: {data}")
     # Send the PATCH request to update the backend
     response = await make_request(
         "patch", f"{Config.BACKEND_URL}/scrapped-data/{scrapped_data_id}", data
@@ -126,7 +121,6 @@ async def download_pdf(url_bills):
     # Add downloaded files to contents
     contents.extend([file for file in downloaded_files if file is not None])
 
-    print(f"Downloaded files: {contents}")
     return contents
 
 
