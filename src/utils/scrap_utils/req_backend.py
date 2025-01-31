@@ -57,7 +57,7 @@ async def save_bills(
         "get", f"{Config.BACKEND_URL}/scrapped-data/user-service/{user_service_id}"
     )
 
-    # Si no existe scrapped_data, crear un nuevo registro
+    # Si no existe scrapped_data, crear un nuevo registro y terminar
     if not scrapped_data:
         new_scrapped_data = {
             "user_service_id": user_service_id,
@@ -77,75 +77,46 @@ async def save_bills(
         return {
             "success": True,
             "message": "New scrapped data created with bills",
-            "new_bills_saved": True,
+            "new_bills_saved": True,  # Set to True after creation
         }
 
-    # Ensure scrapped_data is a dictionary
-    if isinstance(scrapped_data, list):
-        # If scrapped_data is a list, process each item
-        for data in scrapped_data:
-            if not isinstance(data, dict):
-                continue  # Skip invalid entries
-
-            # Ensure bills_url is a list within the dictionary
-            if not isinstance(data.get("bills_url"), list):
-                data["bills_url"] = []
-
-            bills_to_save = []
-            existing_bills = data.get("bills_url", [])
-            for bill in bills:
-                if json.dumps(bill) not in [
-                    json.dumps(existing_bill) for existing_bill in existing_bills
-                ]:
-                    bills_to_save.append(bill)
-
-            if bills_to_save:
-                data["bills_url"].extend(bills_to_save)
-                # Send only bills_url for update
-                update_data = {"bills_url": data["bills_url"]}
-                response = await make_request(
-                    "patch",
-                    f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
-                    update_data,
-                )
-                if not response:
-                    return {
-                        "success": False,
-                        "message": "Failed to update scrapped data",
-                        "new_bills_saved": False,
-                    }
-        return {
-            "success": True,
-            "message": "New scrapped data created with bills",
-            "new_bills_saved": True,
-        }
-
-    # Ensure scrapped_data is a dictionary
-    if not isinstance(scrapped_data, dict):
+    # Si scrapped_data existe, asegurarse de que es una lista
+    if not isinstance(scrapped_data, list):
         return {
             "success": False,
-            "message": "Invalid scrapped_data format",
+            "message": "Invalid scrapped_data format: expected a list",
             "new_bills_saved": False,
         }
 
-    # Ensure bills_url is a list within the dictionary
-    if not isinstance(scrapped_data.get("bills_url"), list):
-        scrapped_data["bills_url"] = []
+    # Procesar cada item en scrapped_data
+    new_bills_saved = False
+    for data in scrapped_data:
+        if not isinstance(data, dict):
+            continue  # Saltar items inválidos
 
-    bills_to_save = []
-    existing_bills = scrapped_data.get("bills_url", [])
-    for bill in bills:
-        if json.dumps(bill) not in [
-            json.dumps(existing_bill) for existing_bill in existing_bills
-        ]:
-            bills_to_save.append(bill)
+        # Asegurarse de que bills_url es una lista
+        if not isinstance(data.get("bills_url"), list):
+            data["bills_url"] = []
 
-    if bills_to_save:
-        scrapped_data["bills_url"].extend(bills_to_save)
+        # Filtrar facturas nuevas
+        existing_bills = data.get("bills_url", [])
+        bills_to_save = [
+            bill
+            for bill in bills
+            if json.dumps(bill)
+            not in [json.dumps(existing_bill) for existing_bill in existing_bills]
+        ]
+
+        # Si no hay facturas nuevas, continuar con el siguiente item
+        if not bills_to_save:
+            continue
+
+        # Actualizar scrapped_data con las nuevas facturas
+        data["bills_url"].extend(bills_to_save)
         response = await make_request(
             "patch",
-            f"{Config.BACKEND_URL}/scrapped-data/{scrapped_data['id']}",
-            scrapped_data,
+            f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
+            {"bills_url": data["bills_url"]},
         )
         if not response:
             return {
@@ -153,6 +124,9 @@ async def save_bills(
                 "message": "Failed to update scrapped data",
                 "new_bills_saved": False,
             }
+        new_bills_saved = True
+
+    if new_bills_saved:
         return {
             "success": True,
             "message": "New bills saved successfully",

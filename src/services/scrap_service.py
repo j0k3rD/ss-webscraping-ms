@@ -107,7 +107,7 @@ class ScrapService:
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
 
-        return self.global_bills  # Return the list of bills instead of True
+        return True
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
         try:
@@ -266,7 +266,7 @@ class ScrapService:
                 print("Task finished with error " + self.solver.error_code)
         except Exception as e:
             print(f"Error solving captcha: {e}")
-            ("TimeoutError SOLVE CAPTCHA. Reattempting...")
+            print("TimeoutError SOLVE CAPTCHA. Reattempting...")
             await page.close()
             return await self.search(data)
 
