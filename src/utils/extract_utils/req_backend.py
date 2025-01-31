@@ -110,11 +110,14 @@ async def download_pdf(url_bills):
     temp_dir = tempfile.mkdtemp()
     contents = []
 
+    # Filter out bills with None URLs
+    valid_url_bills = [bill for bill in url_bills if bill.get("url") is not None]
+
     # Download all PDFs in parallel
     async with httpx.AsyncClient() as client:
         tasks = [
             download_single_pdf(client, bill["url"], temp_dir, i)
-            for i, bill in enumerate(url_bills, start=1)
+            for i, bill in enumerate(valid_url_bills, start=1)
         ]
         downloaded_files = await asyncio.gather(*tasks)
 
