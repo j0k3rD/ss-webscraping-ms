@@ -18,7 +18,7 @@ class ChromeBrowser(Browser):
 
         # self.browser = await self.playwright.firefox.launch()
         self.browser = await self.playwright.chromium.connect_over_cdp(
-            headless=True, endpoint_url=endpoint_url
+            endpoint_url=endpoint_url
         )
         return self.browser
 

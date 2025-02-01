@@ -65,7 +65,6 @@ async def save_bills(
             "consumption_data": {},
             "debt": debt,
         }
-        print("SCRAPE DATA", new_scrapped_data)
         response = await make_request(
             "post", f"{Config.BACKEND_URL}/scrapped-data", new_scrapped_data
         )
