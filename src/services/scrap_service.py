@@ -53,12 +53,13 @@ class ScrapService:
             should_extract = (
                 save_result["new_bills_saved"]  # New bills were saved
                 or not save_result["success"]  # There was an error during saving
+                or any("url" in bill for bill in result)  # There are URLs in the bills
             )
 
             return {
                 "debt": self.debt,
                 "save_result": save_result,
-                "should_extract": should_extract,  # Set based on new_bills_saved or errors
+                "should_extract": should_extract,  # Set based on new_bills_saved, errors, or URLs
             }
         except Exception as e:
             print(f"Error during search: {e}")
@@ -116,7 +117,7 @@ class ScrapService:
 
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
-
+        print("GLOBAL BILLS: ", self.global_bills)
         return self.global_bills
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
@@ -253,6 +254,11 @@ class ScrapService:
                 for href in elements_href
                 if href is not None
             ]
+
+            # Agregar las URLs a global_bills
+            global_bills.extend(elements_formatted)
+
+            # Guardar las facturas
             await save_bills(user_service_id, elements_formatted)
             self.save_bills_called = True
 

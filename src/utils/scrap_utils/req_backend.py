@@ -38,6 +38,7 @@ async def make_request(
 async def save_bills(
     user_service_id: int, bills: List[Dict], debt: bool = False
 ) -> Dict[str, Any]:
+    print(f"BIlls: {bills}")
     """
     Guarda las facturas en el backend y devuelve un resultado estructurado.
     """
@@ -120,6 +121,10 @@ async def save_bills(
                 "message": "Failed to update scrapped data",
                 "new_bills_saved": False,
             }
+        new_bills_saved = True
+
+    # Si hay URLs en las facturas, marcar como new_bills_saved
+    if any("url" in bill for bill in bills):
         new_bills_saved = True
 
     if new_bills_saved:
