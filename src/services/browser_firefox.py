@@ -10,7 +10,7 @@ class FirefoxBrowser(Browser):
     async def _get_browser(self):
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.firefox.launch(
-            # headless=False,
+            headless=True,
             # proxy={
             # "server": "rpc.proxyrotator.com:6969",
             # }

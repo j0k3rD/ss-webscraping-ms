@@ -107,6 +107,7 @@ class ScrapService:
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
 
+        print("GLOBAL BILLS: ", self.global_bills)
         return self.global_bills
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
@@ -147,7 +148,7 @@ class ScrapService:
         customer_number,
         user_service_id,
         customer_number_index,
-        global_bills,
+        bills,
     ):
         element_type = action["element_type"]
         selector = get_selector(action)
@@ -178,12 +179,12 @@ class ScrapService:
             "name",
         ]:
             await self.handle_element(
-                page, action, debt, no_debt_text, user_service_id, global_bills
+                page, action, debt, no_debt_text, user_service_id, bills
             )
         elif element_type == "modal":
             await self.handle_modal(page, selector)
         elif element_type == "buttons":
-            await self.handle_buttons(page, selector)
+            await self.handle_buttons(page, selector)  # Handle buttons and downloads
 
         return customer_number_index
 
@@ -202,7 +203,7 @@ class ScrapService:
         return customer_number_index
 
     async def handle_element(
-        self, page, action, debt, no_debt_text, user_service_id, global_bills
+        self, page, action, debt, no_debt_text, user_service_id, bills
     ):
         elements = await page.query_selector_all(get_selector(action))
         if elements and debt:
@@ -210,33 +211,47 @@ class ScrapService:
             self.debt = no_debt_text not in debt_message if no_debt_text else True
 
         if action.get("query"):
-            await self.handle_query(
-                page, action, elements, user_service_id, global_bills
-            )
+            await self.handle_query(page, action, elements, user_service_id, bills)
+        elif action.get("element_type") == "buttons":
+            await self.handle_buttons(page, get_selector(action))  # Handle buttons
 
-    async def handle_query(self, page, action, elements, user_service_id, global_bills):
-        if action.get("redirect"):
-            href = await elements[0].get_attribute("href")
-            absolute_url = urljoin(page.url, href)
-            await page.goto(absolute_url, wait_until="load")
-        elif action.get("form"):
-            for i in range(0, 6, 2):
-                td = elements[i]
-                form = await td.query_selector("form")
-                await form.dispatch_event("submit")
-                await asyncio.sleep(12)
-        else:
-            elements_href = [
-                await element.get_attribute("href") for element in elements
-            ]
-            base_url = urlunparse(urlparse(page.url)._replace(path=""))
-            elements_formatted = [
-                {"url": urljoin(base_url, href)}
-                for href in elements_href
-                if href is not None
-            ]
-            await save_bills(user_service_id, elements_formatted)
-            self.save_bills_called = True
+    async def handle_buttons(self, page, selector):
+        """
+        Handle clicking all buttons in a given selector and wait for downloads.
+        """
+        buttons = await page.query_selector_all(selector)
+        downloaded_files = set()  # Track downloaded filenames
+
+        for button in buttons:
+            try:
+                # Scroll the button into view if needed
+                await button.scroll_into_view_if_needed()
+
+                # Click the button and wait for the download to start
+                async with page.expect_download(
+                    timeout=30000
+                ) as download_info:  # 30-second timeout
+                    await button.click()
+                download = await download_info.value
+
+                # Wait for the download to complete
+                file_path = (
+                    await download.path()
+                )  # This ensures the download is complete
+                filename = download.suggested_filename
+
+                # Skip if the file has already been downloaded
+                if filename in downloaded_files:
+                    print(f"Skipping duplicate download: {filename}")
+                    continue
+
+                downloaded_files.add(filename)
+                print(f"Downloaded PDF: {filename}")
+
+                # Add a small delay between button clicks
+                await asyncio.sleep(2)  # Adjust the delay as needed
+            except Exception as e:
+                print(f"Error clicking button: {e}")
 
     async def handle_modal(self, page, selector):
         await page.wait_for_selector(selector)
@@ -246,9 +261,42 @@ class ScrapService:
             print("Modal not found")
 
     async def handle_buttons(self, page, selector):
+        """
+        Handle clicking all buttons in a given selector and wait for downloads.
+        """
         buttons = await page.query_selector_all(selector)
+        downloaded_files = set()  # Track downloaded filenames
+
         for button in buttons:
-            await button.click()
+            try:
+                # Scroll the button into view if needed
+                await button.scroll_into_view_if_needed()
+
+                # Click the button and wait for the download to start
+                async with page.expect_download(
+                    timeout=30000
+                ) as download_info:  # 30-second timeout
+                    await button.click()
+                download = await download_info.value
+
+                # Wait for the download to complete
+                file_path = (
+                    await download.path()
+                )  # This ensures the download is complete
+                filename = download.suggested_filename
+
+                # Skip if the file has already been downloaded
+                if filename in downloaded_files:
+                    print(f"Skipping duplicate download: {filename}")
+                    continue
+
+                downloaded_files.add(filename)
+                print(f"Downloaded PDF: {filename}")
+
+                # Add a small delay between button clicks
+                await asyncio.sleep(2)  # Adjust the delay as needed
+            except Exception as e:
+                print(f"Error clicking button: {e}")
 
     async def solve_captcha(self, data, page, sitekey_clean, captcha_button_content):
         try:
