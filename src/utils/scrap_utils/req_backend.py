@@ -38,7 +38,7 @@ async def make_request(
 async def save_bills(
     user_service_id: int, bills: List[Dict], debt: bool = False
 ) -> Dict[str, Any]:
-    print(f"BIlls: {bills}")
+    print(f"Debt: {debt}")
     """
     Guarda las facturas en el backend y devuelve un resultado estructurado.
     """
@@ -96,24 +96,25 @@ async def save_bills(
             data["bills_url"] = []
 
         # Filtrar facturas nuevas
-        existing_bills = data.get("bills_url", [])
-        bills_to_save = [
-            bill
-            for bill in bills
-            if json.dumps(bill)
-            not in [json.dumps(existing_bill) for existing_bill in existing_bills]
-        ]
+        # existing_bills = data.get("bills_url", [])
+        # bills_to_save = [
+        #     bill
+        #     for bill in bills
+        #     if json.dumps(bill)
+        #     not in [json.dumps(existing_bill) for existing_bill in existing_bills]
+        # ]
 
-        # Si no hay facturas nuevas, continuar con el siguiente item
-        if not bills_to_save:
-            continue
+        # # Si no hay facturas nuevas, continuar con el siguiente item
+        # if not bills_to_save:
+        #     continue
 
-        # Actualizar scrapped_data con las nuevas facturas
-        data["bills_url"].extend(bills_to_save)
+        data["bills_url"].extend(bills)
+        # en data pasar bills_url y debt
+        print(f"Data UPDATE: {data}")
         response = await make_request(
             "patch",
             f"{Config.BACKEND_URL}/scrapped-data/{data['id']}",
-            {"bills_url": data["bills_url"]},
+            {"bills_url": data["bills_url"], "debt": debt},
         )
         if not response:
             return {

@@ -1,4 +1,5 @@
 import asyncio
+import re
 from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse, urljoin
 import pdfplumber
@@ -117,7 +118,6 @@ class ScrapService:
 
         if captcha and not self.save_bills_called:
             await save_bills(user_service_id, self.global_bills, self.debt)
-        print("GLOBAL BILLS: ", self.global_bills)
         return self.global_bills
 
     async def handle_captcha(self, data, page, captcha_sequence, customer_number):
@@ -219,19 +219,26 @@ class ScrapService:
             elements = await page.query_selector_all(get_selector(action))
             if elements and debt:
                 debt_message = await elements[0].inner_text()
-                self.debt = no_debt_text not in debt_message if no_debt_text else True
+                if no_debt_text:
+                    # Usar una expresión regular para verificar el mensaje
+                    if re.search(no_debt_text, debt_message):
+                        self.debt = False  # No hay deuda si el mensaje coincide
+                    else:
+                        self.debt = True  # Hay deuda si el mensaje no coincide
+                else:
+                    self.debt = True  # Si no hay no_debt_text, asumimos que hay deuda
             else:
-                # If the element is not found, assume there is a debt
+                # Si no se encuentran elementos, asumimos que hay deuda
                 self.debt = True
         except Exception as e:
             print(f"Error handling element: {e}")
-            # If there's an error (e.g., timeout), assume there is a debt
+            # Si hay un error, asumimos que hay deuda
             self.debt = True
 
         if action.get("query"):
             await self.handle_query(page, action, elements, user_service_id, bills)
         elif action.get("element_type") == "buttons":
-            await self.handle_buttons(page, get_selector(action))  # Handle buttons
+            await self.handle_buttons(page, get_selector(action))
 
     async def handle_query(self, page, action, elements, user_service_id, global_bills):
         if action.get("redirect"):
