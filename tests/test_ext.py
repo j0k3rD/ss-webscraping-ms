@@ -1,7 +1,7 @@
 import pdfplumber
 
 
-async def extract_data_from_pdf(pdf_path):
+def extract_data_from_pdf(pdf_path):
     """
     Extrae texto de un archivo PDF, incluyendo todas las páginas.
     """
@@ -9,4 +9,7 @@ async def extract_data_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text += page.extract_text() + "\n"
-    return text
+    print(text)
+
+
+extract_data_from_pdf("/home/j0k3r/home/Facultad/ss-webscraping-ms/fac_ay.pdf")
