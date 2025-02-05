@@ -29,7 +29,6 @@ class BillService:
         Returns:
             Dict containing operation status and results
         """
-        print("Saving bills", bills)
         try:
             # Verify user service exists
             user_service = await self.client.get_user_service(user_service_id)

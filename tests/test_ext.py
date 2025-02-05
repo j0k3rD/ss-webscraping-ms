@@ -9,7 +9,6 @@ def extract_data_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text += page.extract_text() + "\n"
-    print(text)
 
 
 extract_data_from_pdf("/home/j0k3r/home/Facultad/ss-webscraping-ms/fac_ay.pdf")

@@ -66,7 +66,6 @@ class ExtractDataService:
         """
         Process both URL-based and content-based bills.
         """
-        print("bills antes", bills)
         if not isinstance(bills, list):
             logger.error(f"Invalid bills format: {type(bills)}")
             return
@@ -87,7 +86,6 @@ class ExtractDataService:
                     elif bill_url.get("content"):
                         content_bills.append(bill_url)
 
-        print("url_bills", url_bills)
         # Process URL-based bills
         if url_bills:
             await self._process_url_bills(url_bills)
@@ -104,12 +102,10 @@ class ExtractDataService:
             url_bills: List of bills containing URLs
         """
         try:
-            print("Checking URL bills")
             # Download PDFs
             pdf_files = await self.bill_service.download_pdfs(url_bills)
             logger.info(f"Downloaded {len(pdf_files)} PDF files")
 
-            print("pdf_files", pdf_files)
             # Process each PDF
             for pdf_path in pdf_files:
                 logger.info(f"Processing PDF: {pdf_path}")
@@ -224,8 +220,6 @@ class ExtractDataService:
                     raise ValueError("Empty scrapped data list")
                 scrapped_data = scrapped_data[0]  # Take first item if list
 
-            print("scrapped_data", scrapped_data)
-
             # Verify scrapped_data is a dict before accessing
             if not isinstance(scrapped_data, dict):
                 raise ValueError(f"Invalid scrapped data format: {type(scrapped_data)}")
@@ -234,12 +228,10 @@ class ExtractDataService:
             if not scrapped_data_id:
                 raise ValueError("Scrapped data ID not found")
 
-            print("data_to_save", data_to_save)
             result = await self.client.update_scrapped_data(
                 scrapped_data_id=scrapped_data_id, consumption_data=data_to_save
             )
 
-            print("result", result)
             return "Data saved successfully" if result else "Failed to save data"
 
         except Exception as e:

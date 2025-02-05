@@ -321,7 +321,6 @@ def main():
         pdf_path = "/home/j0k3r/home/Facultad/ss-webscraping-ms/fac_ay.pdf"
         data = process_utility_bill_pdf(pdf_path)
 
-        # Print extracted data
         print("\n=== Bill Information ===")
         for key, value in data.items():
             if isinstance(value, dict):
