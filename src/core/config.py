@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     SS_WEB_PORT: int
     ACCESS_TOKEN_EXPIRY: int
     REFRESH_TOKEN_EXPIRY: int
+    INTERNAL_API_KEY: str
+    SERVICE_TO_SERVICE_SECRET: str
     BROWSER: str
     KEY_ANTICAPTCHA: str
     BACKEND_URL: str

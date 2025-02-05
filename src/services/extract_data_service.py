@@ -1,102 +1,248 @@
-import os
-from ..utils.extract_utils.req_backend import (
-    download_pdf,
-    get_data_by_user_service_id,
-    save_consumed_data,
-)
-from ..utils.extract_utils.convert_data import convert_data_to_json
-from ..utils.extract_utils.extract_data_from_pdf import extract_data_from_pdf
+import json
+import os, logging
+from typing import List, Dict, Any, Optional
+from src.services.http_client import MainServiceClient
+from src.services.bill_service import BillService
+from src.utils.process_utility_bill_pdf import process_utility_bill_pdf
+from src.utils.convert_data import convert_data_to_json
+from decimal import Decimal
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ExtractDataService:
-    """
-    Servicio para procesar facturas.
-    """
+    """Service for extracting and processing bill data."""
 
     def __init__(self):
-        self.all_data = []
+        self.client = MainServiceClient()
+        self.bill_service = BillService()
+        self.processed_data: List[Dict] = []
 
-    async def plumb_bills(self, data):
+    async def process_bills(self, user_service_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Descarga, procesa y guarda facturas para un número de cliente dado.
+        Process bills for a given user service.
         """
-        user_service_id = data["user_service"]["id"]
         try:
-            # Step 1: Fetch scrapped_data once
-            scrapped_data = await get_data_by_user_service_id(user_service_id)
-            if not scrapped_data or not isinstance(scrapped_data, dict):
-                raise ValueError(f"Invalid scrapped_data: {scrapped_data}")
+            user_service_id = user_service_data["user_service"]["id"]
+            logger.info(f"Starting bill processing for user service {user_service_id}")
 
-            bills_url = scrapped_data.get("bills_url", [])
-            if not isinstance(bills_url, list):
-                raise ValueError(
-                    f"Unexpected data type for bills_url: {type(bills_url)}"
+            # Get scrapped data
+            scrapped_data = await self.client.get_scrapped_data(user_service_id)
+            if not scrapped_data:
+                logger.error(
+                    f"No scrapped data found for user service {user_service_id}"
                 )
+                return {"success": False, "message": "No scrapped data found"}
 
-            # Step 2: Separate bills with URLs and bills with content
-            url_bills = [
-                bill
-                for bill in bills_url
-                if isinstance(bill, dict) and "url" in bill and bill["url"] is not None
-            ]
-            content_bills = [
-                bill
-                for bill in bills_url
-                if isinstance(bill, dict)
-                and "content" in bill
-                and bill["content"] is not None
-            ]
+            # Check if scrapped_data is a dictionary and has bills_url
+            if isinstance(scrapped_data, dict):
+                bills = scrapped_data.get("bills_url", [])
+            else:
+                # If scrapped_data is already a list of bills
+                bills = scrapped_data
 
-            # Step 3: Download all PDFs in parallel (only for bills with URLs)
-            if url_bills:
-                temp_dir_result = await download_pdf(url_bills)  # Pass only URL bills
-                if not isinstance(temp_dir_result, (str, tuple, list)):
-                    raise ValueError(f"Failed to download PDF: {temp_dir_result}")
+            # Process bills
+            await self._process_all_bills(bills)
 
-                if isinstance(temp_dir_result, tuple):
-                    _, temp_dir = temp_dir_result
-                elif isinstance(temp_dir_result, list):
-                    files = temp_dir_result  # Assuming the list contains file paths
-                else:
-                    temp_dir = temp_dir_result
+            # Save processed data
+            if self.processed_data:
+                save_result = await self._save_processed_data(user_service_id)
+                return {
+                    "success": True,
+                    "message": "Bills processed and saved successfully",
+                    "data": save_result,
+                }
 
-                if isinstance(temp_dir_result, list):
-                    for pdf_file in files:
-                        extracted_data = await extract_data_from_pdf(pdf_file)
-                        json_data = await convert_data_to_json(extracted_data)
-                        self.all_data.append(json_data)
-                else:
-                    if not isinstance(temp_dir, str):
-                        raise ValueError(
-                            f"Expected temp_dir to be a string, got {type(temp_dir)}"
-                        )
-
-                    files = await self.get_files_in_directory(temp_dir)
-                    for pdf_file in files:
-                        pdf_path = os.path.join(temp_dir, pdf_file)
-                        extracted_data = await extract_data_from_pdf(pdf_path)
-                        json_data = await convert_data_to_json(extracted_data)
-                        self.all_data.append(json_data)
-
-            # Step 4: Process bills with content
-            for bill in content_bills:
-                print("Content found, skipping download and proceeding to extraction.")
-                json_data = await convert_data_to_json(bill)
-                self.all_data.append(json_data)
-
-            # Convert all_data to a dictionary if it's a list
-            if isinstance(self.all_data, list):
-                self.all_data = {i: data for i, data in enumerate(self.all_data)}
-
-            # Step 5: Save the processed data
-            await save_consumed_data(user_service_id, self.all_data)
+            return {"success": True, "message": "No new bills to process", "data": None}
 
         except Exception as e:
-            print(f"Error al procesar las facturas: {e}")
+            error_msg = f"Error processing bills: {str(e)}"
+            logger.error(error_msg)
+            return {"success": False, "message": error_msg}
 
-    async def get_files_in_directory(self, directory):
-        if not isinstance(directory, str):
-            raise ValueError(
-                f"Expected directory to be a string, got {type(directory)}"
+    async def _process_all_bills(self, bills: List[Dict]) -> None:
+        """
+        Process both URL-based and content-based bills.
+        """
+        print("bills antes", bills)
+        if not isinstance(bills, list):
+            logger.error(f"Invalid bills format: {type(bills)}")
+            return
+
+        # Separate bills by type
+        url_bills = []
+        content_bills = []
+
+        for bill in bills:
+            if not isinstance(bill, dict):
+                continue
+
+            # Handle nested bills_url structure
+            if "bills_url" in bill and isinstance(bill["bills_url"], list):
+                for bill_url in bill["bills_url"]:
+                    if bill_url.get("url"):
+                        url_bills.append(bill_url)
+                    elif bill_url.get("content"):
+                        content_bills.append(bill_url)
+
+        print("url_bills", url_bills)
+        # Process URL-based bills
+        if url_bills:
+            await self._process_url_bills(url_bills)
+
+        # Process content-based bills
+        if content_bills:
+            await self._process_content_bills(content_bills)
+
+    async def _process_url_bills(self, url_bills: List[Dict]) -> None:
+        """
+        Process bills that need to be downloaded from URLs.
+
+        Args:
+            url_bills: List of bills containing URLs
+        """
+        try:
+            print("Checking URL bills")
+            # Download PDFs
+            pdf_files = await self.bill_service.download_pdfs(url_bills)
+            logger.info(f"Downloaded {len(pdf_files)} PDF files")
+
+            print("pdf_files", pdf_files)
+            # Process each PDF
+            for pdf_path in pdf_files:
+                logger.info(f"Processing PDF: {pdf_path}")
+                extracted_data = await self._process_pdf(pdf_path)
+                if extracted_data:
+                    logger.info(f"Extracted data from PDF: {extracted_data}")
+                    try:
+                        json_data = await self._convert_to_json(extracted_data)
+                        self.processed_data.append(json_data)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to process data from {pdf_path}: {str(e)}"
+                        )
+                        continue
+                else:
+                    logger.warning(f"No data extracted from PDF: {pdf_path}")
+
+                # Clean up the temporary file
+                try:
+                    os.remove(pdf_path)
+                    logger.info(f"Removed temporary file: {pdf_path}")
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to remove temporary file {pdf_path}: {str(e)}"
+                    )
+
+        except Exception as e:
+            logger.error(f"Error processing URL bills: {str(e)}")
+
+    async def _process_content_bills(self, content_bills: List[Dict]) -> None:
+        """
+        Process bills that already have content.
+
+        Args:
+            content_bills: List of bills containing content
+        """
+        logger.info(f"Processing {len(content_bills)} content-based bills")
+        for bill in content_bills:
+            try:
+                json_data = await self._convert_to_json(bill)
+                self.processed_data.append(json_data)
+            except Exception as e:
+                logger.error(f"Error processing content bill: {str(e)}")
+
+    async def _process_pdf(self, pdf_path: str) -> Optional[Dict]:
+        """
+        Process a single PDF file.
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            Extracted data from the PDF or None if processing fails
+        """
+        try:
+
+            return await process_utility_bill_pdf(pdf_path)
+        except Exception as e:
+            logger.error(f"Error processing PDF {pdf_path}: {str(e)}")
+            return None
+
+    async def _convert_to_json(self, data: dict) -> dict:
+        """
+        Convert extracted data to JSON format.
+
+        Args:
+            data: Dictionary containing extracted data
+
+        Returns:
+            dict: JSON-compatible dictionary
+        """
+        try:
+            # Convert Decimal objects to strings
+            def decimal_to_str(obj):
+                if isinstance(obj, Decimal):
+                    return str(obj)
+                return obj
+
+            # Clean and convert the dictionary
+            cleaned_data = json.loads(json.dumps(data, default=decimal_to_str))
+            return cleaned_data
+
+        except Exception as e:
+            logger.error(f"Error converting data to JSON: {str(e)}")
+            raise
+
+    async def _save_processed_data(self, user_service_id: int) -> str:
+        """
+        Save processed data to the backend.
+
+        Args:
+            user_service_id: ID of the user service
+
+        Returns:
+            Status message indicating save result
+        """
+        try:
+            # Convert list to dictionary if needed
+            data_to_save = (
+                {i: data for i, data in enumerate(self.processed_data)}
+                if isinstance(self.processed_data, list)
+                else self.processed_data
             )
-        return os.listdir(directory)
+
+            scrapped_data = await self.client.get_scrapped_data(user_service_id)
+            if not scrapped_data:
+                raise ValueError("No scrapped data found")
+
+            # Handle case where scrapped_data is a list
+            if isinstance(scrapped_data, list):
+                if not scrapped_data:
+                    raise ValueError("Empty scrapped data list")
+                scrapped_data = scrapped_data[0]  # Take first item if list
+
+            print("scrapped_data", scrapped_data)
+
+            # Verify scrapped_data is a dict before accessing
+            if not isinstance(scrapped_data, dict):
+                raise ValueError(f"Invalid scrapped data format: {type(scrapped_data)}")
+
+            scrapped_data_id = scrapped_data.get("id")
+            if not scrapped_data_id:
+                raise ValueError("Scrapped data ID not found")
+
+            print("data_to_save", data_to_save)
+            result = await self.client.update_scrapped_data(
+                scrapped_data_id=scrapped_data_id, consumption_data=data_to_save
+            )
+
+            print("result", result)
+            return "Data saved successfully" if result else "Failed to save data"
+
+        except Exception as e:
+            error_msg = f"Error saving processed data: {str(e)}"
+            logger.error(error_msg)
+            raise
