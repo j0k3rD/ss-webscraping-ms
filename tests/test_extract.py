@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 import pdfplumber
 
 
@@ -97,26 +97,6 @@ class GenericBillParser:
                 r"Localidad:\s*([A-Z\s]+)",
                 r"Loc\.:\s*([A-Z\s]+)",
             ],
-            # Charges and services
-            "charges": [
-                r"(Cargo Fijo[^$]*?)\$\s*([\d,.]+)",
-                r"(Cargo Variable[^$]*?)\$\s*([\d,.]+)",
-                r"(Subsidio[^:]*?):\s*\$?\s*(-?[\d,.]+)",
-                r"(Impuesto[^:]*?):\s*\$?\s*([\d,.]+)",
-                r"(Cargo[^:]*?):\s*\$?\s*([\d,.]+)",
-                r"(Bonificación[^:]*?):\s*\$?\s*(-?[\d,.]+)",
-                r"(Cuota Fija[^$]*?)\$?\s*([\d,.]+)",
-                r"([\w\s]+?)\s*\$\s*([\d,.]+)(?=\n)",
-                r"CARGO FIJO[^\d]+([\d,.]+)",
-                r"SUBSIDIO REGIMEN ZONA FRIA \(LEY 27637\)[^\d]+-([\d,.]+)",
-                r"IMPUESTO LEY 25413[^\d]+([\d,.]+)",
-                r"BALANCE ANUAL IIBBZ[^\d]+-([\d,.]+)",
-                r"CONT\. COM\. E IND[^\d]+([\d,.]+)",
-                r"DIF\.BCE\.COM E IND[^\d]+([\d,.]+)",
-                r"IMPUESTOR SOBRE LOS I\.I\.B\.B[^\d]+([\d,.]+)",
-                r"INTERESES POR MORA[^\d]+([\d,.]+)",
-                r"IVOA ALICUOTA GENERAL[^\d]+([\d,.]+)",
-            ],
             # Service details
             "service_details": [
                 r"(\d{2}/\d{4})\s+(\d+)\s+([A-Z\s]+)\s+(\d+\s*[A-Z]+)\s+\$\s*([\d,.]+)",
@@ -139,29 +119,66 @@ class GenericBillParser:
                 r"Calorías suministradas\s+(\d+\.\d+)\s*kcal",
                 r"Consumo a facturar a \d+ kcal/m³\s+(\d+)\s*x\s+(\d+\.\d+)\s*x\s*\(\s*(\d+\.\d+)\s*\)\s+(\d+)\s*m³",
                 r"M3 asignados.*?(\d+\.\d+)\s*m³",
+                r"Cargo Variable kWh\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)",
             ],
         }
 
+    def safe_decimal_convert(self, value: str) -> Decimal:
+        """Safely convert a string to Decimal, handling different number formats."""
+        if not value:
+            return Decimal("0")
+
+        # Remove any spaces
+        value = value.strip()
+
+        # Handle numbers with both comma and period
+        if "," in value and "." in value:
+            # Assuming format like "1.234,56" -> convert to "1234.56"
+            value = value.replace(".", "").replace(",", ".")
+        # Handle numbers with only comma
+        elif "," in value:
+            value = value.replace(",", ".")
+
+        try:
+            return Decimal(value)
+        except (DecimalException, ValueError):
+            return Decimal("0")
+
     def extract_consumption(self, text: str) -> Dict[str, Decimal]:
-        measured = Decimal(
+        """Extract consumption information with safe decimal conversion."""
+        measured = self.safe_decimal_convert(
             self.extract_field(text, [self.patterns["consumption"][0]]) or "0"
         )
-        factor = Decimal(
+        factor = self.safe_decimal_convert(
             self.extract_field(text, [self.patterns["consumption"][1]]) or "0"
         )
-        calories = Decimal(
+        calories = self.safe_decimal_convert(
             self.extract_field(text, [self.patterns["consumption"][2]]) or "0"
         )
 
         consumption_match = re.search(self.patterns["consumption"][3], text)
         if consumption_match:
-            billed = Decimal(consumption_match.group(4))
+            billed = self.safe_decimal_convert(consumption_match.group(4))
         else:
             billed = Decimal("0")
 
-        assigned = Decimal(
+        assigned = self.safe_decimal_convert(
             self.extract_field(text, [self.patterns["consumption"][4]]) or "0"
         )
+
+        variable_charge_match = re.search(self.patterns["consumption"][5], text)
+        variable_charge = {
+            "kwh": Decimal("0"),
+            "rate": Decimal("0"),
+            "amount": Decimal("0"),
+        }
+
+        if variable_charge_match:
+            variable_charge = {
+                "kwh": self.safe_decimal_convert(variable_charge_match.group(1)),
+                "rate": self.safe_decimal_convert(variable_charge_match.group(2)),
+                "amount": self.safe_decimal_convert(variable_charge_match.group(3)),
+            }
 
         return dict(
             measured_m3=measured,
@@ -169,6 +186,7 @@ class GenericBillParser:
             calories_supplied=calories,
             billed_m3=billed,
             assigned_m3=assigned,
+            variable_charge=variable_charge,
         )
 
     def add_pattern(self, category: str, pattern: str) -> None:
@@ -213,27 +231,6 @@ class GenericBillParser:
             except (AttributeError, IndexError):
                 continue
         return default
-
-    def extract_charges(self, text: str) -> Dict[str, Decimal]:
-        """Extract all charges from the bill."""
-        charges = {}
-        for pattern in self.patterns["charges"]:
-            try:
-                matches = re.finditer(pattern, text, re.IGNORECASE)
-                for match in matches:
-                    if match and match.groups():
-                        concept = match.group(1).strip() if match.group(1) else ""
-                        amount_str = (
-                            match.group(2).replace(",", ".") if match.group(2) else "0"
-                        )
-                        try:
-                            amount = Decimal(amount_str)
-                            charges[concept] = amount
-                        except (DecimalException, TypeError):
-                            continue
-            except (re.error, IndexError):
-                continue
-        return charges
 
     def extract_business_info(self, text: str) -> Dict[str, str]:
         """Extract business information."""
@@ -326,7 +323,6 @@ class GenericBillParser:
             "service_period": self.extract_field(text, self.patterns["service_period"]),
             "address": self.extract_address(text).__dict__,
             "business_info": self.extract_business_info(text),
-            "charges": self.extract_charges(text),
             "service_details": self.extract_service_details(text),
             "installments": self.extract_installments(text),
             "meter_info": self.extract_meter_info(text),

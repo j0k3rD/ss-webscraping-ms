@@ -2,7 +2,7 @@ import decimal
 import re
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 import logging
 
 logger = logging.getLogger(__name__)
@@ -128,6 +128,7 @@ class GenericBillParser:
                 r"Calorías suministradas\s+(\d+\.\d+)\s*kcal",
                 r"Consumo a facturar a \d+ kcal/m³\s+(\d+)\s*x\s+(\d+\.\d+)\s*x\s*\(\s*(\d+\.\d+)\s*\)\s+(\d+)\s*m³",
                 r"M3 asignados.*?(\d+\.\d+)\s*m³",
+                r"Cargo Variable kWh\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)",
             ],
         }
 
@@ -278,26 +279,65 @@ class GenericBillParser:
 
         return history
 
-    def extract_consumption(self, text: str) -> Dict[str, Decimal]:
-        measured = Decimal(
-            self.extract_field(text, [self.patterns["consumption"][0]]) or "0"
+    def safe_decimal_convert(self, value: str) -> Optional[Decimal]:
+        """Safely convert a string to Decimal, handling different number formats."""
+        if not value:
+            return None
+
+        # Remove any spaces
+        value = value.strip()
+
+        # Handle numbers with both comma and period
+        if "," in value and "." in value:
+            # Assuming format like "1.234,56" -> convert to "1234.56"
+            value = value.replace(".", "").replace(",", ".")
+        # Handle numbers with only comma
+        elif "," in value:
+            value = value.replace(",", ".")
+
+        try:
+            return Decimal(value)
+        except (DecimalException, ValueError):
+            return None
+
+    def extract_consumption(
+        self, text: str
+    ) -> Dict[str, Optional[Union[Decimal, Dict]]]:
+        """Extract consumption information with safe decimal conversion."""
+        measured = self.safe_decimal_convert(
+            self.extract_field(text, [self.patterns["consumption"][0]]) or None
         )
-        factor = Decimal(
-            self.extract_field(text, [self.patterns["consumption"][1]]) or "0"
+        factor = self.safe_decimal_convert(
+            self.extract_field(text, [self.patterns["consumption"][1]]) or None
         )
-        calories = Decimal(
-            self.extract_field(text, [self.patterns["consumption"][2]]) or "0"
+        calories = self.safe_decimal_convert(
+            self.extract_field(text, [self.patterns["consumption"][2]]) or None
         )
 
         consumption_match = re.search(self.patterns["consumption"][3], text)
-        if consumption_match:
-            billed = Decimal(consumption_match.group(4))
-        else:
-            billed = Decimal("0")
-
-        assigned = Decimal(
-            self.extract_field(text, [self.patterns["consumption"][4]]) or "0"
+        billed = (
+            self.safe_decimal_convert(consumption_match.group(4))
+            if consumption_match
+            else None
         )
+
+        assigned = self.safe_decimal_convert(
+            self.extract_field(text, [self.patterns["consumption"][4]]) or None
+        )
+
+        variable_charge_match = re.search(self.patterns["consumption"][5], text)
+        variable_charge = {
+            "kwh": None,
+            "rate": None,
+            "amount": None,
+        }
+
+        if variable_charge_match:
+            variable_charge = {
+                "kwh": self.safe_decimal_convert(variable_charge_match.group(1)),
+                "rate": self.safe_decimal_convert(variable_charge_match.group(2)),
+                "amount": self.safe_decimal_convert(variable_charge_match.group(3)),
+            }
 
         return dict(
             measured_m3=measured,
@@ -305,6 +345,7 @@ class GenericBillParser:
             calories_supplied=calories,
             billed_m3=billed,
             assigned_m3=assigned,
+            variable_charge=variable_charge,
         )
 
     def parse(self, text: str) -> Dict[str, Any]:
