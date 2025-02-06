@@ -68,6 +68,11 @@ class GenericBillParser:
                 r"Inicio[^:]*?:\s*(\d{2}/\d{2}/\d{4})",
                 r"ESTABLECIMIENTO[^:]*?:\s*([\d-]+)",
             ],
+            "meter_info": [
+                r"Nro medidor:\s*(\d+)",
+                r"Lectura Actual.*?(\d+)\s+Real\s+(\d{2}/\d{2}/\d{4})",
+                r"Lectura Anterior.*?(\d+)\s+(\d{2}/\d{2}/\d{4})",
+            ],
             # Service period
             "service_period": [
                 r"PERIODO\s+([^$\n]+?)(?=\s+VENCIMIENTO)",
@@ -102,6 +107,15 @@ class GenericBillParser:
                 r"(Bonificación[^:]*?):\s*\$?\s*(-?[\d,.]+)",
                 r"(Cuota Fija[^$]*?)\$?\s*([\d,.]+)",
                 r"([\w\s]+?)\s*\$\s*([\d,.]+)(?=\n)",
+                r"CARGO FIJO[^\d]+([\d,.]+)",
+                r"SUBSIDIO REGIMEN ZONA FRIA \(LEY 27637\)[^\d]+-([\d,.]+)",
+                r"IMPUESTO LEY 25413[^\d]+([\d,.]+)",
+                r"BALANCE ANUAL IIBBZ[^\d]+-([\d,.]+)",
+                r"CONT\. COM\. E IND[^\d]+([\d,.]+)",
+                r"DIF\.BCE\.COM E IND[^\d]+([\d,.]+)",
+                r"IMPUESTOR SOBRE LOS I\.I\.B\.B[^\d]+([\d,.]+)",
+                r"INTERESES POR MORA[^\d]+([\d,.]+)",
+                r"IVOA ALICUOTA GENERAL[^\d]+([\d,.]+)",
             ],
             # Service details
             "service_details": [
@@ -119,7 +133,43 @@ class GenericBillParser:
             "installments": [
                 r"CUOTA\s+\d+\s+VENCIMIENTO\s+(\d{2}/\d{2}/\d{4})\s+IMPORTE\s+\$\s*([\d,.]+)"
             ],
+            "consumption": [
+                r"Consumo Medido\s+(\d+)\s*m³",
+                r"Factor de correción.*?\(1\)\s+(\d+\.\d+)",
+                r"Calorías suministradas\s+(\d+\.\d+)\s*kcal",
+                r"Consumo a facturar a \d+ kcal/m³\s+(\d+)\s*x\s+(\d+\.\d+)\s*x\s*\(\s*(\d+\.\d+)\s*\)\s+(\d+)\s*m³",
+                r"M3 asignados.*?(\d+\.\d+)\s*m³",
+            ],
         }
+
+    def extract_consumption(self, text: str) -> Dict[str, Decimal]:
+        measured = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][0]]) or "0"
+        )
+        factor = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][1]]) or "0"
+        )
+        calories = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][2]]) or "0"
+        )
+
+        consumption_match = re.search(self.patterns["consumption"][3], text)
+        if consumption_match:
+            billed = Decimal(consumption_match.group(4))
+        else:
+            billed = Decimal("0")
+
+        assigned = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][4]]) or "0"
+        )
+
+        return dict(
+            measured_m3=measured,
+            correction_factor=factor,
+            calories_supplied=calories,
+            billed_m3=billed,
+            assigned_m3=assigned,
+        )
 
     def add_pattern(self, category: str, pattern: str) -> None:
         """Add a new pattern to an existing category or create a new category."""
@@ -127,6 +177,31 @@ class GenericBillParser:
             self.patterns[category].append(pattern)
         else:
             self.patterns[category] = [pattern]
+
+    def extract_meter_info(self, text: str) -> Dict[str, Any]:
+        """Extract meter reading information."""
+        meter_info = {}
+        meter_match = re.search(self.patterns["meter_info"][0], text)
+        if meter_match:
+            meter_info["meter_number"] = meter_match.group(1)
+
+        reading_match = re.search(self.patterns["meter_info"][1], text)
+        if reading_match:
+            meter_info.update(
+                {
+                    "current_reading": {
+                        "date": reading_match.group(2),
+                        "value": reading_match.group(3),
+                        "type": reading_match.group(4),
+                    },
+                    "previous_reading": {
+                        "date": reading_match.group(5),
+                        "value": reading_match.group(6),
+                    },
+                    "consumption": reading_match.group(7),
+                }
+            )
+        return meter_info
 
     def extract_field(self, text: str, patterns: List[str], default: Any = None) -> Any:
         """Extract a field using multiple regex patterns."""
@@ -143,26 +218,35 @@ class GenericBillParser:
         """Extract all charges from the bill."""
         charges = {}
         for pattern in self.patterns["charges"]:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                concept = match.group(1).strip()
-                amount = Decimal(match.group(2).replace(",", "."))
-                charges[concept] = amount
+            try:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    if match and match.groups():
+                        concept = match.group(1).strip() if match.group(1) else ""
+                        amount_str = (
+                            match.group(2).replace(",", ".") if match.group(2) else "0"
+                        )
+                        try:
+                            amount = Decimal(amount_str)
+                            charges[concept] = amount
+                        except (DecimalException, TypeError):
+                            continue
+            except (re.error, IndexError):
+                continue
         return charges
 
     def extract_business_info(self, text: str) -> Dict[str, str]:
         """Extract business information."""
         info = {}
-        for field in [
-            "CUIT",
-            "INGRESOS BRUTOS",
-            "IVA",
-            "INICIO ACTIVIDAD",
-            "ESTABLECIMIENTO",
-        ]:
-            value = self.extract_field(text, self.patterns["business_info"])
-            if value:
-                info[field] = value
+        for field in ["CUIT", "INGRESOS BRUTOS"]:
+            try:
+                pattern = self.patterns.get(field)
+                if pattern:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match and match.groups():
+                        info[field] = match.group(1).strip()
+            except (re.error, IndexError, AttributeError):
+                continue
         return info
 
     def extract_installments(self, text: str) -> List[Dict[str, Any]]:
@@ -195,56 +279,6 @@ class GenericBillParser:
                 else:
                     details.append({"description": match.group(1)})
         return details
-
-    def extract_address(self, text: str) -> Address:
-        """Extract address information."""
-        address = Address()
-
-        # Extract street and number
-        street_match = self.extract_field(text, self.patterns["address"])
-        if street_match:
-            parts = street_match.split()
-            address.street = " ".join(parts[:-1]) if len(parts) > 1 else street_match
-            address.number = parts[-1] if len(parts) > 1 else None
-
-        # Extract location information
-        address.postal_code = self.extract_field(text, self.patterns["postal_code"])
-        location_match = self.extract_field(text, self.patterns["location"])
-        if location_match:
-            address.city = next(
-                (
-                    part
-                    for part in location_match.split()
-                    if part in ["SAN RAFAEL", "MENDOZA", "MALARGUE", "BUENOS AIRES"]
-                ),
-                None,
-            )
-            if address.city:
-                address.province = (
-                    "MENDOZA"
-                    if address.city in ["SAN RAFAEL", "MALARGUE"]
-                    else address.city
-                )
-
-        # Extract apartment information
-        apt_match = re.search(r"Dpto:(\d{2}-\d{2})", text)
-        if apt_match:
-            address.apartment = apt_match.group(1)
-
-        return address
-
-    def extract_consumption_history(self, text: str) -> Dict[str, float]:
-        """Extract consumption history."""
-        history = {}
-        history_pattern = r"(\d{2}/\d{2})\s+(\d+(?:,\d+)?)"
-        matches = re.finditer(history_pattern, text)
-
-        for match in matches:
-            period = match.group(1)
-            consumption = float(match.group(2).replace(",", "."))
-            history[period] = consumption
-
-        return history
 
     def extract_address(self, text: str) -> Address:
         """Extract address information."""
@@ -295,6 +329,8 @@ class GenericBillParser:
             "charges": self.extract_charges(text),
             "service_details": self.extract_service_details(text),
             "installments": self.extract_installments(text),
+            "meter_info": self.extract_meter_info(text),
+            "consumption": self.extract_consumption(text),
         }
 
         return {k: v for k, v in data.items() if v is not None and v != {} and v != ""}
@@ -308,6 +344,7 @@ def process_utility_bill_pdf(pdf_path: str) -> Dict[str, Any]:
                 page.extract_text() for page in pdf.pages if page.extract_text()
             )
 
+        # print(text)
         parser = GenericBillParser()
         return parser.parse(text)
     except Exception as e:
@@ -318,7 +355,7 @@ def process_utility_bill_pdf(pdf_path: str) -> Dict[str, Any]:
 def main():
     """Main function to demonstrate usage."""
     try:
-        pdf_path = "/home/j0k3r/home/Facultad/ss-webscraping-ms/fac_ay.pdf"
+        pdf_path = "/home/j0k3r/home/Facultad/ss-webscraping-ms/fa.pdf"
         data = process_utility_bill_pdf(pdf_path)
 
         print("\n=== Bill Information ===")

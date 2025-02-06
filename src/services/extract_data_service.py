@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from src.services.http_client import MainServiceClient
 from src.services.bill_service import BillService
 from src.utils.process_utility_bill_pdf import process_utility_bill_pdf
-from src.utils.convert_data import convert_data_to_json
+from src.utils.convert_data import GenericBillParser, convert_data_to_json
 from decimal import Decimal
 
 # Configure logging
@@ -136,19 +136,32 @@ class ExtractDataService:
             logger.error(f"Error processing URL bills: {str(e)}")
 
     async def _process_content_bills(self, content_bills: List[Dict]) -> None:
-        """
-        Process bills that already have content.
-
-        Args:
-            content_bills: List of bills containing content
-        """
+        """Process bills that already have content."""
         logger.info(f"Processing {len(content_bills)} content-based bills")
         for bill in content_bills:
             try:
-                json_data = await self._convert_to_json(bill)
+                content = bill.get("content", {})
+
+                # Handle both string and dict content
+                if isinstance(content, dict):
+                    content = content.get("content", "")
+
+                if not isinstance(content, str):
+                    logger.error(f"Invalid content type: {type(content)}")
+                    continue
+
+                bill_data = {
+                    "content": content,
+                    "url": bill.get("url"),
+                    "type": "content",
+                }
+
+                json_data = await convert_data_to_json(content)  # Pass content directly
                 self.processed_data.append(json_data)
+
             except Exception as e:
                 logger.error(f"Error processing content bill: {str(e)}")
+                continue
 
     async def _process_pdf(self, pdf_path: str) -> Optional[Dict]:
         """
@@ -203,8 +216,18 @@ class ExtractDataService:
             Status message indicating save result
         """
         try:
-            # Convert list to dictionary if needed
-            data_to_save = (
+            # Convert Decimal objects to strings in the processed data
+            def convert_decimals(obj):
+                if isinstance(obj, dict):
+                    return {k: convert_decimals(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_decimals(i) for i in obj]
+                elif isinstance(obj, Decimal):
+                    return str(obj)
+                return obj
+
+            # Convert list to dictionary and handle Decimal serialization
+            data_to_save = convert_decimals(
                 {i: data for i, data in enumerate(self.processed_data)}
                 if isinstance(self.processed_data, list)
                 else self.processed_data

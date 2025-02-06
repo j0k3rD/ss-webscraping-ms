@@ -1,7 +1,11 @@
+import decimal
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass
 from decimal import Decimal
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -118,6 +122,13 @@ class GenericBillParser:
             "installments": [
                 r"CUOTA\s+\d+\s+VENCIMIENTO\s+(\d{2}/\d{2}/\d{4})\s+IMPORTE\s+\$\s*([\d,.]+)"
             ],
+            "consumption": [
+                r"Consumo Medido\s+(\d+)\s*m³",
+                r"Factor de correción.*?\(1\)\s+(\d+\.\d+)",
+                r"Calorías suministradas\s+(\d+\.\d+)\s*kcal",
+                r"Consumo a facturar a \d+ kcal/m³\s+(\d+)\s*x\s+(\d+\.\d+)\s*x\s*\(\s*(\d+\.\d+)\s*\)\s+(\d+)\s*m³",
+                r"M3 asignados.*?(\d+\.\d+)\s*m³",
+            ],
         }
 
     def add_pattern(self, category: str, pattern: str) -> None:
@@ -144,9 +155,31 @@ class GenericBillParser:
         for pattern in self.patterns["charges"]:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
-                concept = match.group(1).strip()
-                amount = Decimal(match.group(2).replace(",", "."))
-                charges[concept] = amount
+                try:
+                    concept = match.group(1).strip() if match.group(1) else ""
+                    amount_str = (
+                        match.group(2).replace(",", ".").strip()
+                        if match.group(2)
+                        else "0"
+                    )
+
+                    # Clean amount string - remove any non-numeric chars except . and -
+                    amount_str = "".join(
+                        c for c in amount_str if c.isdigit() or c in ".-"
+                    )
+
+                    # Handle empty or invalid strings
+                    if not amount_str:
+                        amount_str = "0"
+
+                    try:
+                        amount = Decimal(amount_str)
+                        charges[concept] = amount
+                    except decimal.InvalidOperation:
+                        continue
+
+                except (IndexError, AttributeError):
+                    continue
         return charges
 
     def extract_business_info(self, text: str) -> Dict[str, str]:
@@ -245,39 +278,34 @@ class GenericBillParser:
 
         return history
 
-    def extract_address(self, text: str) -> Address:
-        """Extract address information."""
-        address = Address()
+    def extract_consumption(self, text: str) -> Dict[str, Decimal]:
+        measured = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][0]]) or "0"
+        )
+        factor = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][1]]) or "0"
+        )
+        calories = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][2]]) or "0"
+        )
 
-        # Extract street and number
-        street_match = self.extract_field(text, self.patterns["address"])
-        if street_match:
-            parts = street_match.split()
-            address.street = " ".join(parts[:-1]) if len(parts) > 1 else street_match
-            address.number = parts[-1] if len(parts) > 1 else None
+        consumption_match = re.search(self.patterns["consumption"][3], text)
+        if consumption_match:
+            billed = Decimal(consumption_match.group(4))
+        else:
+            billed = Decimal("0")
 
-        # Extract floor and apartment
-        floor_apt_match = re.search(r"(?:P(\d+))?\s*(?:D(\d+))?", text)
-        if floor_apt_match:
-            address.floor = floor_apt_match.group(1)
-            address.apartment = floor_apt_match.group(2)
+        assigned = Decimal(
+            self.extract_field(text, [self.patterns["consumption"][4]]) or "0"
+        )
 
-        # Extract postal code and location
-        address.postal_code = self.extract_field(text, self.patterns["postal_code"])
-        location_match = self.extract_field(text, self.patterns["location"])
-        if location_match:
-            parts = location_match.split()
-            address.city = next(
-                (
-                    part
-                    for part in parts
-                    if part in ["SAN RAFAEL", "MENDOZA", "BUENOS AIRES"]
-                ),
-                None,
-            )
-            address.province = parts[-1] if len(parts) > 1 else None
-
-        return address
+        return dict(
+            measured_m3=measured,
+            correction_factor=factor,
+            calories_supplied=calories,
+            billed_m3=billed,
+            assigned_m3=assigned,
+        )
 
     def parse(self, text: str) -> Dict[str, Any]:
         """Parse all relevant information from the bill text."""
@@ -294,14 +322,37 @@ class GenericBillParser:
             "charges": self.extract_charges(text),
             "service_details": self.extract_service_details(text),
             "installments": self.extract_installments(text),
+            "consumption": self.extract_consumption(text),
         }
 
         return {k: v for k, v in data.items() if v is not None and v != {} and v != ""}
 
 
-async def convert_data_to_json(data):
-    """
-    Convierte los datos de una factura en formato JSON.
-    """
-    parser = GenericBillParser()
-    return parser.parse(data)
+async def convert_data_to_json(content: Union[str, Dict]) -> Dict:
+    """Convert bill content to JSON format."""
+    try:
+        # Handle string or dict input
+        if isinstance(content, dict):
+            content = content.get("content", "")
+
+        if not isinstance(content, str):
+            raise ValueError("Content must be string")
+
+        parser = GenericBillParser()
+        data = parser.parse(content)
+
+        # Convert Decimal objects to strings
+        def convert_decimal(obj):
+            if isinstance(obj, Decimal):
+                return str(obj)
+            elif isinstance(obj, dict):
+                return {k: convert_decimal(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_decimal(x) for x in obj]
+            return obj
+
+        return convert_decimal(data)
+
+    except Exception as e:
+        logger.error(f"Error converting data to JSON: {str(e)}")
+        return {}
