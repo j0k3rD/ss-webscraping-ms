@@ -562,16 +562,51 @@ class WebScrapService:
     async def _handle_form_submission(
         self, elements: List[Any]
     ) -> List[Dict[str, Any]]:
-        """Handle form submission actions."""
-        for i in range(0, 6, 2):
+        """Handle form submission actions with duplicate prevention."""
+        processed_forms = set()  # Track processed forms
+
+        for i in range(len(elements)):  # Use actual length instead of hardcoded 9
             try:
                 td = elements[i]
                 form = await td.query_selector("form")
+
+                if not form:
+                    self.logger.warning(f"No form found in element {i}")
+                    continue
+
+                # Get form identifier using multiple attributes for better uniqueness
+                form_id = await form.evaluate(
+                    """
+                    form => {
+                        const action = form.getAttribute("action") || "";
+                        const inputs = Array.from(form.querySelectorAll("input")).map(
+                            i => i.getAttribute("value")
+                        ).join(",");
+                        return `${action}-${inputs}`;
+                    }
+                """
+                )
+
+                # Skip if already processed
+                if form_id in processed_forms:
+                    self.logger.info(
+                        f"Skipping already processed form {i} with ID {form_id}"
+                    )
+                    continue
+
+                # Submit form and wait for navigation/download
                 await form.dispatch_event("submit")
+                processed_forms.add(form_id)
+                self.logger.info(f"Successfully submitted form {i} with ID {form_id}")
+
+                # Wait for potential file download/processing
                 await asyncio.sleep(12)
+
             except Exception as e:
-                self.logger.warning(f"Form submission failed: {str(e)}")
-        return []
+                self.logger.error(f"Error processing form {i}: {str(e)}")
+                continue
+
+        return self.bills  # Return collected bills instead of empty list
 
     async def _handle_urls(
         self, page: Page, elements: List[Any], user_service_id: str
@@ -610,7 +645,7 @@ class WebScrapService:
 
     async def _handle_buttons(self, page: Page, selector: str) -> None:
         """
-        Handle button clicking and file downloading with improved error handling.
+        Handle button clicking and file downloading with improved error handling and duplicate prevention.
 
         Args:
             page: Playwright page object
@@ -621,10 +656,23 @@ class WebScrapService:
         """
         try:
             buttons = await page.query_selector_all(selector)
-            self.logger.info(f"Found {len(buttons)} buttons to process")
+            processed_buttons = set()  # Track processed buttons using their properties
 
-            for button in buttons:
+            for i, button in enumerate(buttons):
                 try:
+                    # Get unique identifier for button (e.g., text content or some attribute)
+                    button_id = (
+                        await button.get_attribute("href")
+                        or await button.text_content()
+                    )
+
+                    # Skip if already processed
+                    if button_id in processed_buttons:
+                        self.logger.info(
+                            f"Skipping already processed button: {button_id}"
+                        )
+                        continue
+
                     # Ensure button is visible
                     await button.scroll_into_view_if_needed()
 
@@ -634,13 +682,23 @@ class WebScrapService:
 
                     # Wait for download and process
                     download = await download_info.value
+                    suggested_filename = download.suggested_filename
+
+                    # Skip if file already downloaded
+                    if suggested_filename in self.downloaded_files:
+                        self.logger.info(
+                            f"Skipping duplicate download: {suggested_filename}"
+                        )
+                        continue
+
                     await self._handle_download(download)
+                    processed_buttons.add(button_id)
 
                     # Add delay between clicks
                     await asyncio.sleep(2)
 
                 except Exception as e:
-                    self.logger.error(f"Error processing button: {str(e)}")
+                    self.logger.error(f"Error processing button {i}: {str(e)}")
                     continue
 
         except Exception as e:

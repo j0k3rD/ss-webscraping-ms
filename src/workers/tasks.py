@@ -44,36 +44,36 @@ def scrap_task(self, data: Dict[str, Any]) -> Dict[str, Any]:
         scrap_service = WebScrapService()
         extract_service = ExtractDataService()
 
-        # try:
-        #     async with WebScrapService() as scrap_service:
-        #         result = await scrap_service.search(data)
-        #         logger.info("Scraping completed successfully")
+        try:
+            async with WebScrapService() as scrap_service:
+                result = await scrap_service.search(data)
+                logger.info("Scraping completed successfully")
 
-        #         if result.get("should_extract", True):
-        #             try:
-        extract_service = ExtractDataService()
-        await extract_service.process_bills(data)
-        return {
-            "status": "success",
-            "message": "Data extracted successfully",
-        }
-        #     except Exception as e:
-        #         logger.error(f"Extraction failed: {str(e)}")
-        #         return {
-        #             "status": "error",
-        #             "message": f"Error during extraction: {str(e)}",
-        #         }
-        # else:
-        #     return {
-        #         "status": "success",
-        #         "message": result.get("save_result", {}).get(
-        #             "message", "No action needed"
-        #         ),
-        #     }
+                if result.get("should_extract", True):
+                    try:
+                        extract_service = ExtractDataService()
+                        await extract_service.process_bills(data)
+                        return {
+                            "status": "success",
+                            "message": "Data extracted successfully",
+                        }
+                    except Exception as e:
+                        logger.error(f"Extraction failed: {str(e)}")
+                        return {
+                            "status": "error",
+                            "message": f"Error during extraction: {str(e)}",
+                        }
+                else:
+                    return {
+                        "status": "success",
+                        "message": result.get("save_result", {}).get(
+                            "message", "No action needed"
+                        ),
+                    }
 
-        # except Exception as e:
-        #     logger.error(f"Unexpected error: {str(e)}")
-        #     return {"status": "error", "message": str(e)}
+        except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
+            return {"status": "error", "message": str(e)}
 
     return _scrap_task(data)
 

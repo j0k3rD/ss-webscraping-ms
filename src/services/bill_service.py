@@ -15,9 +15,41 @@ class BillService:
     def __init__(self):
         self.client = MainServiceClient()
 
+    def _deduplicate_bills(self, bills: List[Dict]) -> List[Dict]:
+        """
+        Remove duplicate bills based on content or url.
+
+        Args:
+            bills: List of bill dictionaries with content or url
+
+        Returns:
+            List of unique bills
+        """
+        unique_bills = []
+        seen_contents = set()
+        seen_urls = set()
+
+        for bill in bills:
+            if not isinstance(bill, dict):
+                continue
+
+            # Check content-based bills
+            if "content" in bill:
+                if bill["content"] not in seen_contents:
+                    seen_contents.add(bill["content"])
+                    unique_bills.append(bill)
+            # Check URL-based bills
+            elif "url" in bill:
+                if bill["url"] not in seen_urls:
+                    seen_urls.add(bill["url"])
+                    unique_bills.append(bill)
+
+        return unique_bills
+
     async def save_bills(
         self, user_service_id: int, bills: List[Dict], debt: bool = False
     ) -> Dict:
+        logger.info(f"Received {len(bills)} bills to save")
         """
         Save bills for a user service.
 
@@ -40,6 +72,10 @@ class BillService:
                     "new_bills_saved": False,
                 }
 
+            # Deduplicate incoming bills
+            unique_bills = self._deduplicate_bills(bills)
+            logger.info(f"After deduplication: {len(unique_bills)} unique bills")
+
             try:
                 # Get existing scrapped data
                 scrapped_data = await self.client.get_scrapped_data(user_service_id)
@@ -50,7 +86,7 @@ class BillService:
                         f"No existing scrapped data found for user service {user_service_id}. Creating new entry."
                     )
                     result = await self.client.create_scrapped_data(
-                        user_service_id=user_service_id, bills=bills, debt=debt
+                        user_service_id=user_service_id, bills=unique_bills, debt=debt
                     )
                     return {
                         "success": True,
@@ -71,22 +107,28 @@ class BillService:
                     logger.warning(f"Invalid scrapped data format: {data}")
                     continue
 
-                # Update existing scrapped data
+                # Get current bills and ensure it's a list
                 current_bills = data.get("bills_url", [])
                 if not isinstance(current_bills, list):
                     current_bills = []
 
-                # Create a set of existing URLs to avoid duplicates
+                # Create sets for existing content and URLs
+                existing_contents = {
+                    bill.get("content") for bill in current_bills if bill.get("content")
+                }
                 existing_urls = {
                     bill.get("url") for bill in current_bills if bill.get("url")
                 }
 
                 # Only add bills that don't already exist
-                new_bills = [
-                    bill
-                    for bill in bills
-                    if bill.get("url") and bill["url"] not in existing_urls
-                ]
+                new_bills = []
+                for bill in unique_bills:
+                    if "content" in bill and bill["content"] not in existing_contents:
+                        new_bills.append(bill)
+                        existing_contents.add(bill["content"])
+                    elif "url" in bill and bill["url"] not in existing_urls:
+                        new_bills.append(bill)
+                        existing_urls.add(bill["url"])
 
                 if new_bills:
                     updated_bills = current_bills + new_bills
