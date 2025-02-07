@@ -1,9 +1,12 @@
 # 🕷️ SmartServices Web Scraping Microservice
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-✓-blue?logo=fastapi)
+![Docker](https://img.shields.io/badge/Docker-✓-blue?logo=docker)
+![Redis](https://img.shields.io/badge/Redis-✓-red?logo=redis)
+![Celery](https://img.shields.io/badge/Celery-✓-green?logo=celery)
+![Playwright](https://img.shields.io/badge/Playwright-✓-orange?logo=playwright)
+
 
 > 🚀 A robust web scraping microservice with multi-browser support and PDF processing capabilities.
 
