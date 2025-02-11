@@ -16,8 +16,8 @@ RUN adduser \
     --uid ${UID} \
     appuser
 
-# Instalar las dependencias del sistema necesarias para Playwright y otras utilidades
-RUN apt-get update && apt-get install -y \
+# Install system dependencies for Playwright and utilities
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libxcb-shm0 \
     libx11-xcb1 \
     libx11-6 \
@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libpango-1.0-0 \
     libglib2.0-0 \
-    libgtk-3-dev \
+    libgtk-3-0 \
     libasound2 \
     libfreetype6 \
     libfontconfig1 \
@@ -45,28 +45,24 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar el archivo de requirements e instalar las dependencias de Python
+# Install Python dependencies
 COPY requirements/dev.txt /src/requirements.txt
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar Playwright en Python
-RUN python -m pip install playwright
+# Install Playwright and its dependencies
+RUN pip install --no-cache-dir playwright
+RUN playwright install-deps
+RUN playwright install chromium
 
-# Instalar las dependencias del sistema necesarias para Playwright
-RUN python -m playwright install-deps
-
-# Instalar los navegadores de Playwright
-RUN python -m playwright install
-
-# Copiar el código de la aplicación
+# Copy application code
 COPY . .
 
-# Copiar el script de espera
-# COPY wait-for-redis.sh /usr/local/bin/wait-for-redis.sh
-# RUN chmod +x /usr/local/bin/wait-for-redis.sh
+# Set permissions for the non-root user
+RUN chown -R appuser:appuser /src
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 5000
 
-# Usar el script de espera antes de iniciar la aplicación
 CMD ["./boot.sh"]
