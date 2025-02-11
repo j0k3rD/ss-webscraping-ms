@@ -5,39 +5,45 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /src
 
-# Install system dependencies in a single RUN command
-RUN set -eux \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        curl \
-        iputils-ping \
-        redis-tools \
-        libnss3 \
-        libatk1.0-0 \
-        libatk-bridge2.0-0 \
-        libcups2 \
-        libdrm2 \
-        libxkbcommon0 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxfixes3 \
-        libxrandr2 \
-        libgbm1 \
-        libasound2 \
-        libpango-1.0-0 \
-        libpangocairo-1.0-0 \
-        gcc \
-        python3-dev \
-        libffi-dev \
+# First group of essential packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    iputils-ping \
+    redis-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    libffi-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Browser dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd -ms /bin/bash appuser
 
-# Install Python dependencies with verbose output
+# Copy and install Python dependencies
 COPY requirements/dev.txt requirements.txt
-RUN pip install --no-cache-dir -v -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Playwright
 RUN pip install --no-cache-dir playwright && \
