@@ -1,72 +1,72 @@
-FROM python:3.12-slim
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS base
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /src
 
-# Configure apt and update package lists
-RUN echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/10no-check-valid-until \
-    && echo 'APT::Get::Assume-Yes "true";' > /etc/apt/apt.conf.d/90assumeyes \
-    && echo 'APT::Install-Suggests "0";' > /etc/apt/apt.conf.d/90no-suggests \
-    && echo 'APT::Install-Recommends "0";' > /etc/apt/apt.conf.d/90no-recommends
+ARG UID=10001
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid ${UID} \
+    appuser
 
-# Update package list and install essential build dependencies
-RUN set -ex \
-    && apt-get update \
-    && apt-get install -y build-essential \
+# Instalar las dependencias del sistema necesarias para Playwright y otras utilidades
+RUN apt-get update && apt-get install -y \
+    libxcb-shm0 \
+    libx11-xcb1 \
+    libx11-6 \
+    libxcb1 \
+    libxext6 \
+    libxrandr2 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxi6 \
+    libatk1.0-0 \
+    libpangocairo-1.0-0 \
+    libcairo2 \
+    libpango-1.0-0 \
+    libglib2.0-0 \
+    libgtk-3-dev \
+    libasound2 \
+    libfreetype6 \
+    libfontconfig1 \
+    libdbus-1-3 \
+    redis-tools \
+    curl \
+    iputils-ping \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install runtime dependencies
-RUN set -ex \
-    && apt-get update \
-    && apt-get install -y \
-        curl \
-        iputils-ping \
-        redis-tools \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Copiar el archivo de requirements e instalar las dependencias de Python
+COPY requirements/dev.txt /src/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -r requirements.txt
 
-# Install browser dependencies
-RUN set -ex \
-    && apt-get update \
-    && apt-get install -y \
-        libnss3 \
-        libatk1.0-0 \
-        libatk-bridge2.0-0 \
-        libcups2 \
-        libxkbcommon0 \
-        libxcomposite1 \
-        libxdamage1 \
-        libxfixes3 \
-        libxrandr2 \
-        libgbm1 \
-        libasound2 \
-        libpango-1.0-0 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Instalar Playwright en Python
+RUN python -m pip install playwright
 
-# Create non-root user
-RUN useradd -ms /bin/bash appuser
+# Instalar las dependencias del sistema necesarias para Playwright
+RUN python -m playwright install-deps
 
-# Copy and install Python dependencies
-COPY requirements/dev.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar los navegadores de Playwright
+RUN python -m playwright install
 
-# Install Playwright
-RUN pip install --no-cache-dir playwright && \
-    playwright install --with-deps chromium
-
-# Copy application code
+# Copiar el código de la aplicación
 COPY . .
 
-# Set permissions
-RUN chown -R appuser:appuser /src
-
-# Switch to non-root user
-USER appuser
+# Copiar el script de espera
+# COPY wait-for-redis.sh /usr/local/bin/wait-for-redis.sh
+# RUN chmod +x /usr/local/bin/wait-for-redis.sh
 
 EXPOSE 5001
 
+# Usar el script de espera antes de iniciar la aplicación
 CMD ["./boot.sh"]
