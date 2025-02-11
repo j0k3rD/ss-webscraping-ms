@@ -1,5 +1,5 @@
 ARG PYTHON_VERSION=3.12
-FROM python:${PYTHON_VERSION}-slim AS base
+FROM python:${PYTHON_VERSION}-slim-bullseye AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -16,8 +16,10 @@ RUN adduser \
     --uid ${UID} \
     appuser
 
-# Update and install system dependencies in separate steps
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
     libxcb-shm0 \
     libx11-xcb1 \
     libx11-6 \
@@ -45,7 +47,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
+# Install Python dependencies
 COPY requirements/dev.txt /src/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install -r requirements.txt
