@@ -26,15 +26,18 @@ RUN set -eux \
         libasound2 \
         libpango-1.0-0 \
         libpangocairo-1.0-0 \
+        gcc \
+        python3-dev \
+        libffi-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd -ms /bin/bash appuser
 
-# Install Python dependencies
+# Install Python dependencies with verbose output
 COPY requirements/dev.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -v -r requirements.txt
 
 # Install Playwright
 RUN pip install --no-cache-dir playwright && \
