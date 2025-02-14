@@ -66,7 +66,7 @@ COPY . .
 # COPY wait-for-redis.sh /usr/local/bin/wait-for-redis.sh
 # RUN chmod +x /usr/local/bin/wait-for-redis.sh
 
-EXPOSE 5000
+EXPOSE 5001
 
 # Usar el script de espera antes de iniciar la aplicación
 CMD ["./boot.sh"]
