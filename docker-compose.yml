@@ -8,9 +8,7 @@ services:
     ports:
       - ${SS_WEB_PORT}:${SS_WEB_PORT}
     env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://ss-webscraper-redis:6379
+      - stack.env
     networks:
       - ss-network
     depends_on:
@@ -48,9 +46,7 @@ services:
     depends_on:
       - ss-webscraper-redis
     env_file:
-      - .env
-    environment:
-      - REDIS_URL=redis://ss-webscraper-redis:6379
+      - stack.env
     networks:
       - ss-network
     deploy:
